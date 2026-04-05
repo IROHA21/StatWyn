@@ -1,0 +1,5 @@
+France|#FF0000
+Germany|#00FF00
+Italy|#0000FF
+Spain|#FFFF00
+England|#FF00FF

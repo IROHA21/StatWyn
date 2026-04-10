@@ -17,6 +17,7 @@ public class MapCoordinates : MonoBehaviour
         
         Debug.Log($"Texture is {mapTexture.width} x {mapTexture.height}");
         Debug.Log($"Loaded {provinceLookup.Count} provinces");
+
     }
     
     void Update()
@@ -49,7 +50,13 @@ public class MapCoordinates : MonoBehaviour
                 if (provinceLookup.ContainsKey(clickedHex))
                 {
                     ProvinceData data = provinceLookup[clickedHex];
-                    Debug.Log($"Clicked: {data.provinceID}");
+
+                    string neighboorsList = string.Join(", ", data.neighbors);
+
+                    Debug.Log($"Clicked: {data.provinceID}, the nighboors are :  {neighboorsList}");
+
+
+
                 }
                 else
                 {

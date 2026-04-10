@@ -9,7 +9,11 @@ public class ProvinceData
     public string hexColor;
 
     public string Country;
+
+    
     public List<string> neighbors;
+
+    public Vector3 centerPosition;  
 
     public ProvinceData(string name, string hex,string country , List<string> neighborList)
     {
@@ -18,6 +22,7 @@ public class ProvinceData
         hexColor = hex;
         Country = country;
         neighbors = neighborList;
+        centerPosition = Vector3.zero; 
     
 
     }

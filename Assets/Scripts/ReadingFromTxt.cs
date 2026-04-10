@@ -4,7 +4,8 @@ using UnityEngine;
 public static class ProvinceLoader
 {
     // CHANGED: Dictionary now uses string (hex) as key, not Color
-    public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<string, string> targetDictionary)
+    //public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<string, string> targetDictionary)
+    public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<string, ProvinceData> targetDictionary)
     {
         if (provinceDataFile == null)
         {
@@ -21,13 +22,27 @@ public static class ProvinceLoader
             
             string[] parts = line.Split('|');
             
-            if (parts.Length == 2)
+            if (parts.Length == 4)
             {
                 string provinceName = parts[0].Trim();
                 string hexColor = parts[1].Trim();  // This is already hex like "#FF0000"
-                
+                string countryName = parts[2].Trim();
+                string neighborsString = parts[3].Trim();
+
+
+
+                List<string> neighbors = new List<string>();
+                if (!string.IsNullOrEmpty(neighborsString))
+                {
+                    string[] neighborArray = neighborsString.Split(',');
+                    foreach (string neighbor in neighborArray)
+                    {
+                        neighbors.Add(neighbor.Trim());
+                    }
+                }
+                ProvinceData data = new ProvinceData(provinceName, hexColor,countryName, neighbors);
                 // CHANGED: Store with hex as the key
-                targetDictionary[hexColor] = provinceName;
+                targetDictionary[hexColor] = data;
                 
                 Debug.Log($"Loaded: {provinceName} = {hexColor}");
             }

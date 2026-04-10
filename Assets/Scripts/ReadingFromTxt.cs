@@ -3,35 +3,32 @@ using UnityEngine;
 
 public static class ProvinceLoader
 {
-    public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<Color, string> targetDictionary)
+    // CHANGED: Dictionary now uses string (hex) as key, not Color
+    public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<string, string> targetDictionary)
     {
-        // SAFETY CHECK: Did we forget to drag the file?
         if (provinceDataFile == null)
         {
             Debug.LogError("No file assigned! Drag Provinces.txt into the Inspector");
             return;
         }
         
-        // STEP 1: Split file into individual lines
         string[] lines = provinceDataFile.text.Split('\n');
         
-        // STEP 2: Loop through each line
         foreach (string line in lines)
         {
-            // Skip empty lines
             if (string.IsNullOrWhiteSpace(line))
                 continue;
             
-            // STEP 3: Split line by pipe character
             string[] parts = line.Split('|');
             
-            // STEP 4: Check we have exactly 2 parts
             if (parts.Length == 2)
             {
                 string provinceName = parts[0].Trim();
-                string hexColor = parts[1].Trim();
-                Color color = HexToColor(hexColor);
-                targetDictionary[color] = provinceName;
+                string hexColor = parts[1].Trim();  // This is already hex like "#FF0000"
+                
+                // CHANGED: Store with hex as the key
+                targetDictionary[hexColor] = provinceName;
+                
                 Debug.Log($"Loaded: {provinceName} = {hexColor}");
             }
             else
@@ -43,6 +40,19 @@ public static class ProvinceLoader
         Debug.Log($"Loaded {targetDictionary.Count} provinces");
     }
     
+    // NEW: Convert Color to Hex string
+    public static string ColorToHex(Color color)
+    {
+        // Convert float (0-1) to byte (0-255)
+        int r = Mathf.RoundToInt(color.r * 255);
+        int g = Mathf.RoundToInt(color.g * 255);
+        int b = Mathf.RoundToInt(color.b * 255);
+        
+        // Format as #RRGGBB
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+    
+    // Keep this for loading, but now it's private (only used internally)
     private static Color HexToColor(string hex)
     {
         if (hex.StartsWith("#"))

@@ -4,51 +4,44 @@ using UnityEngine;
 
 public class MapCoordinates : MonoBehaviour
 {
-
-    Dictionary<Color, string> myDictionary = new Dictionary<Color, string>();
+    // CHANGED: Dictionary key is now string (hex), not Color
+    Dictionary<string, string> provinceLookup = new Dictionary<string, string>();
 
     public TextAsset provinceDataFile;
     
-    // Start is called before the first frame update
     void Start()
     {
-
-        ProvinceLoader.LoadProvincesFromFile(provinceDataFile, myDictionary);
+        // Load provinces (now stores hex -> name)
+        ProvinceLoader.LoadProvincesFromFile(provinceDataFile, provinceLookup);
         
-        
-
         Renderer myRenderer = GetComponent<Renderer>();
         Texture2D myTexture = (Texture2D)myRenderer.material.mainTexture;
 
+        Debug.Log($"Texture is {myTexture.width} wide and {myTexture.height} high");
 
-        Debug.Log($"the texture is {myTexture.width} wide and {myTexture.height} high");
-
-        Debug.Log($"i want to understand what the hell is {myRenderer} and {myTexture}");
-        foreach (KeyValuePair<Color, string> entry in myDictionary)
+        // CHANGED: Debug shows hex keys
+        foreach (KeyValuePair<string, string> entry in provinceLookup)
         {
-        Debug.Log($"Color: R={entry.Key.r}, G={entry.Key.g}, B={entry.Key.b} - Value: {entry.Value}");
+            Debug.Log($"Hex: {entry.Key} - Province: {entry.Value}");
         }
     }
-
-    // Update is called once per frame
+    
     void Update()
     {
         if (Input.GetMouseButtonDown(0))
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit ;
+            RaycastHit hit;
 
-            if (Physics.Raycast(ray, out hit ) && hit.collider.gameObject == this.gameObject)
+            if (Physics.Raycast(ray, out hit) && hit.collider.gameObject == this.gameObject)
             {
                 Renderer rend = hit.collider.GetComponent<Renderer>();
                 Vector3 localPoint = rend.transform.InverseTransformPoint(hit.point);
                 Vector3 size = rend.bounds.size;
                 
-                // Convert local position to 0-1 UV range using local extents
                 float u = (localPoint.x + size.x * 0.5f) / size.x;
                 float v = (localPoint.y + size.y * 0.5f) / size.y;
                 
-                // Clamp to prevent overflow
                 u = Mathf.Clamp01(u);
                 v = Mathf.Clamp01(v);
                 
@@ -56,27 +49,24 @@ public class MapCoordinates : MonoBehaviour
                 int x = (int)(u * tex.width);
                 int y = (int)(v * tex.height);
                 Color clickedColor = tex.GetPixel(x, y);
-
-                string colorName = GetColorName(clickedColor);
-                Debug.Log($"Clicked on: {colorName} - Color: {clickedColor}");
-            
+                
+                // CHANGED: Convert clicked color to hex
+                string clickedHex = ProvinceLoader.ColorToHex(clickedColor);
+                
+                // CHANGED: Look up by hex string
+                string provinceName = GetProvinceName(clickedHex);
+                
+                // CHANGED: Debug shows hex
+                Debug.Log($"Clicked on: {provinceName} - Hex: {clickedHex} - RGB({clickedColor.r:F2}, {clickedColor.g:F2}, {clickedColor.b:F2})");
             }
-
-
-
         }
     }
 
-
-    string GetColorName(Color color) {
-    // Loop through dictionary to find matching color
-    foreach (var entry in myDictionary)
+    // CHANGED: Takes hex string, not Color
+    string GetProvinceName(string hexColor)
     {
-        if (entry.Key == color)
-            return entry.Value;
+        if (provinceLookup.ContainsKey(hexColor))
+            return provinceLookup[hexColor];
+        return "unknown";
     }
-    return "unknown";
-    }
-
-    
 }

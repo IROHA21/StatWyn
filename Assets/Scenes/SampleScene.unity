@@ -407,6 +407,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   provinceDataFile: {fileID: 4900000, guid: 89535e5b46b6e164986bcd0d2207605e, type: 3}
+  centerDataFile: {fileID: 4900000, guid: 0234f6ffaa3b6dc4dbb4e0afa9a02933, type: 3}
+  unitPrefab: {fileID: 0}
 --- !u!64 &1531599913
 MeshCollider:
   m_ObjectHideFlags: 0

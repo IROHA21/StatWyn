@@ -7,7 +7,15 @@ public class MapCoordinates : MonoBehaviour
 {
     Dictionary<string, ProvinceData> provinceLookup = new Dictionary<string, ProvinceData>();
     public TextAsset provinceDataFile;
+
+    public TextAsset centerDataFile;
     private Texture2D mapTexture;
+
+
+    public GameObject unitPrefab; // Assign in Inspector
+
+    private Unit CurrentUnit;
+    private ProvinceData currentProvinceID;
     
 
 
@@ -24,6 +32,15 @@ public class MapCoordinates : MonoBehaviour
         mapTexture = (Texture2D)myRenderer.material.mainTexture;
         
         ShowAllCenters();
+
+        SpawnUnit spawnUnit = new SpawnUnit();
+        CurrentUnit = spawnUnit.spawnUnit("#4A6FD9", "Knight", provinceLookup, unitPrefab);
+        
+        // Get the starting province data directly from the hex key
+        if (CurrentUnit != null && provinceLookup.ContainsKey("#4A6FD9"))
+        {
+            currentProvinceID = provinceLookup["#4A6FD9"];
+        }
 
         Debug.Log($"Texture is {mapTexture.width} x {mapTexture.height}");
         Debug.Log($"Loaded {provinceLookup.Count} provinces");
@@ -59,11 +76,29 @@ public class MapCoordinates : MonoBehaviour
                 
                 if (provinceLookup.ContainsKey(clickedHex))
                 {
-                    ProvinceData data = provinceLookup[clickedHex];
+                    ProvinceData clickedProvince = provinceLookup[clickedHex];
+                    ProvinceData data = clickedProvince;
 
                     string neighboorsList = string.Join(", ", data.neighbors);
 
                     Debug.Log($"Clicked: {data.provinceID}, the nighboors are :  {neighboorsList}");
+
+                    if (currentProvinceID != null && currentProvinceID.neighbors.Contains(clickedProvince.provinceID))
+                    {
+
+                        Vector3 targetPosition = getInfo.GetProvinceWorldPosition(clickedHex, provinceLookup);
+                        CurrentUnit.MoveToProvince(clickedProvince.provinceID, targetPosition);
+                        Debug.Log($"Moving {CurrentUnit.unitName} to {clickedProvince.provinceID} at {targetPosition}");
+
+                        currentProvinceID = clickedProvince;
+
+                    }else
+                    {
+                        Debug.Log($"Cannot move to {clickedProvince.provinceID} because it's not a neighbor of {currentProvinceID?.provinceID}");
+                    }
+
+                    
+                    
 
 
 
@@ -78,16 +113,15 @@ public class MapCoordinates : MonoBehaviour
 
 
     void LoadCentersFromFile()
+{
+    if (centerDataFile == null)
     {
-    string path = Application.dataPath + "/ProvinceCenters.txt";
-    
-    if (!File.Exists(path))
-    {
-        Debug.LogWarning($"Center file not found: {path}");
+        Debug.LogWarning("Center data file not assigned!");
         return;
     }
     
-    string[] lines = File.ReadAllLines(path);
+    // Split the text asset content into lines
+    string[] lines = centerDataFile.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
     int loadedCount = 0;
     
     foreach (string line in lines)
@@ -115,7 +149,7 @@ public class MapCoordinates : MonoBehaviour
     }
     
     Debug.Log($"Loaded {loadedCount} center positions");
-    }
+}
 
 
     void ShowAllCenters()

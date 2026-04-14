@@ -44,7 +44,7 @@ public static class ProvinceLoader
                 // CHANGED: Store with hex as the key
                 targetDictionary[hexColor] = data;
                 
-                Debug.Log($"Loaded: {provinceName} = {hexColor}");
+               // Debug.Log($"Loaded: {provinceName} = {hexColor}");
             }
             else
             {

@@ -19,6 +19,9 @@ public class MapCoordinates : MonoBehaviour
     
 
 
+
+    public TextAsset provincePixelsFile;  // Drag ProvincePixels.txt here
+    private provinceHighlighter highlighter;
     
     void Start()
     {
@@ -42,8 +45,17 @@ public class MapCoordinates : MonoBehaviour
             currentProvinceID = provinceLookup["#4A6FD9"];
         }
 
-        Debug.Log($"Texture is {mapTexture.width} x {mapTexture.height}");
-        Debug.Log($"Loaded {provinceLookup.Count} provinces");
+        //Debug.Log($"Texture is {mapTexture.width} x {mapTexture.height}");
+        //Debug.Log($"Loaded {provinceLookup.Count} provinces");
+
+        Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
+        BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
+        Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
+
+        highlighter = GetComponent<provinceHighlighter>();
+        if (highlighter == null)
+            highlighter = gameObject.AddComponent<provinceHighlighter>();
+
 
     }
     
@@ -71,12 +83,18 @@ public class MapCoordinates : MonoBehaviour
                 
                 Color clickedColor = mapTexture.GetPixel(x, y);
                 string clickedHex = ProvinceLoader.ColorToHex(clickedColor);
-                
-                Debug.Log($"UV: ({u:F3}, {v:F3}) -> Pixel: ({x}, {y}) -> Hex: {clickedHex}");
+
+                Debug.Log($"Clicked Color RGBA: ({clickedColor.r:F3}, {clickedColor.g:F3}, {clickedColor.b:F3}, {clickedColor.a:F3}) -> Hex: '{clickedHex}' (length: {clickedHex.Length})");
+
+                //Debug.Log($"UV: ({u:F3}, {v:F3}) -> Pixel: ({x}, {y}) -> Hex: {clickedHex}");
                 
                 if (provinceLookup.ContainsKey(clickedHex))
                 {
                     ProvinceData clickedProvince = provinceLookup[clickedHex];
+
+                    highlighter.HighlightProvince(clickedHex);
+                   
+
                     ProvinceData data = clickedProvince;
 
                     string neighboorsList = string.Join(", ", data.neighbors);
@@ -148,7 +166,7 @@ public class MapCoordinates : MonoBehaviour
         }
     }
     
-    Debug.Log($"Loaded {loadedCount} center positions");
+    //Debug.Log($"Loaded {loadedCount} center positions");
 }
 
 
@@ -179,7 +197,7 @@ public class MapCoordinates : MonoBehaviour
             // Remove collider so it doesn't block clicks
             Destroy(marker.GetComponent<Collider>());
             
-            Debug.Log($"Created marker for {data.provinceID} at {data.centerPosition}");
+            //Debug.Log($"Created marker for {data.provinceID} at {data.centerPosition}");
         }
         else
         {

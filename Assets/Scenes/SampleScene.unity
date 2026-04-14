@@ -322,6 +322,7 @@ GameObject:
   - component: {fileID: 1531599912}
   - component: {fileID: 1531599913}
   - component: {fileID: 1531599914}
+  - component: {fileID: 1531599915}
   m_Layer: 0
   m_Name: Map
   m_TagString: Untagged
@@ -408,7 +409,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   provinceDataFile: {fileID: 4900000, guid: 89535e5b46b6e164986bcd0d2207605e, type: 3}
   centerDataFile: {fileID: 4900000, guid: 0234f6ffaa3b6dc4dbb4e0afa9a02933, type: 3}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 5023335447901168019, guid: 472f43a7759a70e489941eaf77939db4,
+    type: 3}
 --- !u!64 &1531599913
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -443,6 +445,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c16547e785556043b7e7fe5c604d303, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1531599915
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1531599907}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4cc025116036bd468d697697b84b2bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  provinceMap: {fileID: 2800000, guid: 1bf92ec2b4c90504d80edda950b2513a, type: 3}
+  ScanOnStart: 1
+  outputfileName: ProvincePixelData.txt
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

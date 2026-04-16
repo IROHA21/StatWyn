@@ -2,7 +2,7 @@ Region1|#4A6FD9|France|Region21,Region23,Region2
 Region2|#950E3A|France|Region1,Region23,Region24,Region4,Region3
 Region3|#11D735|France|Region4,Region2,Region5
 Region4|#CBAD4C|France|Region18,Region2,Region3,Region5
-Region5|#1AC2EF|France|Region3,Region4,Region16,Region6
+Region5|#1AC2EF|France|Region3,Region4,Region16,Region6,Region17
 Region6|#05E69E|France|Region7,Region17,Region5
 Region7|#AD52D5|France|Region6,Region17,Region8,Region14
 Region8|#AEA657|France|Region9,Region12,Region13,Region14,Region7

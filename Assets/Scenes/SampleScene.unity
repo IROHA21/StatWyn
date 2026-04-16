@@ -411,6 +411,7 @@ MonoBehaviour:
   centerDataFile: {fileID: 4900000, guid: 0234f6ffaa3b6dc4dbb4e0afa9a02933, type: 3}
   unitPrefab: {fileID: 5023335447901168019, guid: 472f43a7759a70e489941eaf77939db4,
     type: 3}
+  provincePixelsFile: {fileID: 4900000, guid: fced40e27afac47479e363e2b72cde05, type: 3}
 --- !u!64 &1531599913
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -458,7 +459,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   provinceMap: {fileID: 2800000, guid: 1bf92ec2b4c90504d80edda950b2513a, type: 3}
-  ScanOnStart: 1
+  ScanOnStart: 0
   outputfileName: ProvincePixelData.txt
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

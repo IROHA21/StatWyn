@@ -21,7 +21,7 @@ public class MapCoordinates : MonoBehaviour
 
 
     public TextAsset provincePixelsFile;  // Drag ProvincePixels.txt here
-    private provinceHighlighter highlighter;
+    private glowClick highlighter;
     
     void Start()
     {
@@ -52,9 +52,9 @@ public class MapCoordinates : MonoBehaviour
         BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
         Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
 
-        highlighter = GetComponent<provinceHighlighter>();
-        if (highlighter == null)
-            highlighter = gameObject.AddComponent<provinceHighlighter>();
+        highlighter = GetComponent<glowClick>();
+if (highlighter == null)
+    highlighter = gameObject.AddComponent<glowClick>();
 
 
     }
@@ -92,7 +92,7 @@ public class MapCoordinates : MonoBehaviour
                 {
                     ProvinceData clickedProvince = provinceLookup[clickedHex];
 
-                    highlighter.HighlightProvince(clickedHex);
+                    highlighter.GlowRegion(clickedHex);
                    
 
                     ProvinceData data = clickedProvince;

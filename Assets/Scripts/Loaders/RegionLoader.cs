@@ -27,7 +27,7 @@ public static class RegionLoader
                 string countryID = parts[2].Trim();
                 string tileIDs = parts[3].Trim();
                 
-                RegionData region = new RegionData(regionID, regionName, countryID);
+                RegionData region = new RegionData(regionID, countryID, regionName);
                 
                 string[] tiles = tileIDs.Split(',');
                 foreach (string tile in tiles)

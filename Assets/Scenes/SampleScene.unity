@@ -426,6 +426,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71945747b8c94e944bdef228bf9dc7cf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  regionGroupsFile: {fileID: 4900000, guid: e92014b814cc3794185001d8efe92198, type: 3}
+  countryGroupsFile: {fileID: 4900000, guid: 923d10581d6058148a45ae10acdfe1fe, type: 3}
   provinceDataFile: {fileID: 4900000, guid: 89535e5b46b6e164986bcd0d2207605e, type: 3}
   centerDataFile: {fileID: 4900000, guid: 0234f6ffaa3b6dc4dbb4e0afa9a02933, type: 3}
   unitPrefab: {fileID: 5023335447901168019, guid: 472f43a7759a70e489941eaf77939db4,

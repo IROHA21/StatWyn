@@ -5,7 +5,20 @@ using System.IO;
 
 public class MapCoordinates : MonoBehaviour
 {
+
+
+    // dictionary for quick lookup of province data by hex color
     Dictionary<string, ProvinceData> provinceLookup = new Dictionary<string, ProvinceData>();
+
+    // Dictionaries for regions and countries, if needed later
+
+    public Dictionary<string, RegionData> regionLookup = new Dictionary<string, RegionData>();
+    public Dictionary<string, CountryData> countryLookup = new Dictionary<string, CountryData>();
+
+
+    public TextAsset regionGroupsFile;
+    public TextAsset countryGroupsFile;
+
     public TextAsset provinceDataFile;
 
     public TextAsset centerDataFile;
@@ -24,40 +37,60 @@ public class MapCoordinates : MonoBehaviour
     private glowClick highlighter;
     
     void Start()
+{
+    // Load provinces (tiles)
+    ProvinceLoader.LoadProvincesFromFile(provinceDataFile, provinceLookup);
+    
+    // Load regions
+    RegionLoader.LoadRegionsFromFile(regionGroupsFile, regionLookup);
+    
+    // Load countries
+    CountryLoader.LoadCountriesFromFile(countryGroupsFile, countryLookup);
+
+
+
+    // VERIFICATION: Print what was loaded
+    Debug.Log("=== VERIFICATION ===");
+    Debug.Log($"Tiles loaded: {provinceLookup.Count}");
+    Debug.Log($"Regions loaded: {regionLookup.Count}");
+    Debug.Log($"Countries loaded: {countryLookup.Count}");
+
+
+    foreach (var region in regionLookup.Values)
     {
-        ProvinceLoader.LoadProvincesFromFile(provinceDataFile, provinceLookup);
-
-
-        LoadCentersFromFile();
-        
-        
-        Renderer myRenderer = GetComponent<Renderer>();
-        mapTexture = (Texture2D)myRenderer.material.mainTexture;
-        
-        ShowAllCenters();
-
-        SpawnUnit spawnUnit = new SpawnUnit();
-        CurrentUnit = spawnUnit.spawnUnit("#4A6FD9", "Knight", provinceLookup, unitPrefab);
-        
-        // Get the starting province data directly from the hex key
-        if (CurrentUnit != null && provinceLookup.ContainsKey("#4A6FD9"))
-        {
-            currentProvinceID = provinceLookup["#4A6FD9"];
-        }
-
-        //Debug.Log($"Texture is {mapTexture.width} x {mapTexture.height}");
-        //Debug.Log($"Loaded {provinceLookup.Count} provinces");
-
-        Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
-        BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
-        Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
-
-        highlighter = GetComponent<glowClick>();
-if (highlighter == null)
-    highlighter = gameObject.AddComponent<glowClick>();
-
-
+        Debug.Log($"Region: {region.regionID} ({region.regionName}) - Tiles: {string.Join(", ", region.tiles)}");
     }
+    
+    // Print each country and its regions
+    foreach (var country in countryLookup.Values)
+    {
+        Debug.Log($"Country: {country.countryID} - Regions: {string.Join(", ", country.regions)}");
+    }
+    
+    // Rest of your existing Start() code...
+    LoadCentersFromFile();
+    
+    Renderer myRenderer = GetComponent<Renderer>();
+    mapTexture = (Texture2D)myRenderer.material.mainTexture;
+    
+    ShowAllCenters();
+    
+    SpawnUnit spawnUnit = new SpawnUnit();
+    CurrentUnit = spawnUnit.spawnUnit("#4A6FD9", "Knight", provinceLookup, unitPrefab);
+    
+    if (CurrentUnit != null && provinceLookup.ContainsKey("#4A6FD9"))
+    {
+        currentProvinceID = provinceLookup["#4A6FD9"];
+    }
+    
+    Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
+    BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
+    Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
+    
+    highlighter = GetComponent<glowClick>();
+    if (highlighter == null)
+        highlighter = gameObject.AddComponent<glowClick>();
+}
     
     void Update()
     {

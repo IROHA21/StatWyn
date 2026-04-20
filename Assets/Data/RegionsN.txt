@@ -1,0 +1,4 @@
+R01|North|France|Region1,Region2,Region23,Region21,Region18,Region24
+R02|East|France|Region22,Region20,Region19,Region15,Region13,Region14
+R03|West|France|Region4,Region3,Region5,Region17,Region16
+R04|South|France|Region6,Region7,Region8,Region9,Region10,Region11,Region12

@@ -59,7 +59,7 @@ public class glowClick : MonoBehaviour
         glowQuad.transform.localRotation = Quaternion.Euler(90, 0, 0);
         
         // Position exactly at map center, slightly above to avoid z-fighting
-        glowQuad.transform.localPosition = new Vector3(0, 0, 0);
+        glowQuad.transform.localPosition = new Vector3(0, 0.1f, 0);
         
         // Scale to match map size (adjust 10 to your map scale)
         glowQuad.transform.localScale = new Vector3(10, 10, 1);

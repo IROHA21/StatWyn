@@ -2,104 +2,94 @@ using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
-    [Header("Movement Settings")]
-    public float panSpeed = 20f;      // How fast camera moves when dragging
-    public float zoomSpeed = 5f;      // How fast camera zooms
+    // Zoom variables
+    public float zoomSpeed = 5f;
+    public float minZoomDistance = 5f;
+    public float maxZoomDistance = 15f;
+    private float currentZoomDistance;
+
+    // Pan variables  
+    public float panSpeed = 10f;
+    private Vector3 currentTargetPosition;
     
-    [Header("Zoom Limits")]
-    public float minZoom = 5f;        // Closest zoom (zoomed in)
-    public float maxZoom = 20f;       // Furthest zoom (zoomed out)
-    
-    [Header("Drag Settings")]
-    public bool invertDrag = false;    // Reverse drag direction if needed
-    
-    private Camera cam;
+    // Mouse drag pan variables
     private Vector3 dragOrigin;
     private bool isDragging = false;
-    
+    public float dragSensitivity = 1f;
+
+    //how up in the air the camera is
+    public Vector3 camOffset = new Vector3(0, 10, 0);
+
+    // the target
+    public Transform target;
+
     void Start()
     {
-        cam = GetComponent<Camera>();
+        target = GameObject.Find("Map").transform;
+        currentZoomDistance = camOffset.magnitude;
+        currentTargetPosition = target.position;
     }
-    
+
     void Update()
     {
-        HandlePan();
-        HandleZoom();
-    }
-    
-    void HandlePan()
-    {
-        // Check for right mouse button (desktop) OR two-finger touch (mobile)
-        bool panTrigger = Input.GetMouseButtonDown(1) || (Input.touchCount == 2 && Input.GetTouch(1).phase == TouchPhase.Began);
-        bool panHolding = Input.GetMouseButton(1) || Input.touchCount == 2;
-        bool panRelease = Input.GetMouseButtonUp(1) || (Input.touchCount == 0);
-        
-        // Start dragging
-        if (panTrigger)
+        // Check for mouse button down (left click)
+        if (Input.GetMouseButtonDown(0))
         {
-            dragOrigin = Input.mousePosition;
             isDragging = true;
-            return;
+            dragOrigin = Input.mousePosition;
         }
         
-        // End dragging
-        if (panRelease)
+        // Check for mouse button up
+        if (Input.GetMouseButtonUp(0))
         {
             isDragging = false;
-            return;
-        }
-        
-        // While dragging
-        if (isDragging && panHolding)
-        {
-            Vector3 currentPos = Input.mousePosition;
-            Vector3 difference = dragOrigin - currentPos;
-            
-            // Apply drag direction
-            float direction = invertDrag ? -1f : 1f;
-            Vector3 move = new Vector3(difference.x, difference.y, 0) * direction * panSpeed * Time.deltaTime;
-            transform.Translate(move, Space.World);
-            
-            dragOrigin = currentPos;
         }
     }
-    
-    void HandleZoom()
+
+    void HandleMouseDrag()
+{
+    if (isDragging)
     {
-        float zoomAmount = 0f;
+        // Get current mouse position
+        Vector3 currentMousePos = Input.mousePosition;
         
-        // Mouse scroll wheel (desktop)
-        zoomAmount = Input.GetAxis("Mouse ScrollWheel");
+        // Calculate difference since last frame
+        Vector3 difference = currentMousePos - dragOrigin;
         
-        // Pinch zoom (mobile)
-        if (Input.touchCount == 2)
-        {
-            Touch touch1 = Input.GetTouch(0);
-            Touch touch2 = Input.GetTouch(1);
-            
-            Vector2 prevPos1 = touch1.position - touch1.deltaPosition;
-            Vector2 prevPos2 = touch2.position - touch2.deltaPosition;
-            
-            float prevDistance = Vector2.Distance(prevPos1, prevPos2);
-            float currentDistance = Vector2.Distance(touch1.position, touch2.position);
-            
-            zoomAmount = (prevDistance - currentDistance) * 0.01f;
-        }
+        // Move the target position based on mouse movement (now natural direction)
+        Vector3 panMovement = new Vector3(
+            difference.x * dragSensitivity * Time.deltaTime,
+            0,
+            difference.y * dragSensitivity * Time.deltaTime
+        );
         
-        if (zoomAmount != 0)
-        {
-            if (cam.orthographic)
-            {
-                cam.orthographicSize -= zoomAmount * zoomSpeed;
-                cam.orthographicSize = Mathf.Clamp(cam.orthographicSize, minZoom, maxZoom);
-            }
-            else
-            {
-                // For perspective camera (if you switch later)
-                cam.fieldOfView -= zoomAmount * zoomSpeed;
-                cam.fieldOfView = Mathf.Clamp(cam.fieldOfView, 30f, 100f);
-            }
-        }
+        currentTargetPosition += panMovement;
+        
+        // Update drag origin for smooth continuous dragging
+        dragOrigin = currentMousePos;
+    }
+}
+
+    void LateUpdate()
+    {
+        // Handle mouse drag panning
+        HandleMouseDrag();
+        
+        // ZOOM: Mouse wheel
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        currentZoomDistance -= scroll * zoomSpeed;
+        currentZoomDistance = Mathf.Clamp(currentZoomDistance, minZoomDistance, maxZoomDistance);
+        
+        // Apply position with zoom and pan
+        Vector3 zoomedOffset = camOffset.normalized * currentZoomDistance;
+        this.transform.position = currentTargetPosition + zoomedOffset;
+        this.transform.LookAt(currentTargetPosition);
+        
+        // Add 180 degrees to Y rotation to correct the reversed view
+        this.transform.rotation = Quaternion.Euler(
+            this.transform.eulerAngles.x,
+            this.transform.eulerAngles.y + 180,
+            this.transform.eulerAngles.z
+        );
     }
 }

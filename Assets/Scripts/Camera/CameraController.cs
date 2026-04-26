@@ -87,7 +87,7 @@ public class CameraController : MonoBehaviour
         
         // Add 180 degrees to Y rotation to correct the reversed view
         this.transform.rotation = Quaternion.Euler(
-            this.transform.eulerAngles.x,
+            this.transform.eulerAngles.x - 20,
             this.transform.eulerAngles.y + 180,
             this.transform.eulerAngles.z
         );

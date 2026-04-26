@@ -49,22 +49,22 @@ public class MapCoordinates : MonoBehaviour
 
 
 
-    // VERIFICATION: Print what was loaded
+    /* VERIFICATION: Print what was loaded
     Debug.Log("=== VERIFICATION ===");
     Debug.Log($"Tiles loaded: {provinceLookup.Count}");
     Debug.Log($"Regions loaded: {regionLookup.Count}");
     Debug.Log($"Countries loaded: {countryLookup.Count}");
-
+*/
 
     foreach (var region in regionLookup.Values)
     {
-        Debug.Log($"Region: {region.regionID} ({region.regionName}) - Tiles: {string.Join(", ", region.tiles)}");
+        //Debug.Log($"Region: {region.regionID} ({region.regionName}) - Tiles: {string.Join(", ", region.tiles)}");
     }
     
     // Print each country and its regions
     foreach (var country in countryLookup.Values)
     {
-        Debug.Log($"Country: {country.countryID} - Regions: {string.Join(", ", country.regions)}");
+       // Debug.Log($"Country: {country.countryID} - Regions: {string.Join(", ", country.regions)}");
     }
     
     // Rest of your existing Start() code...
@@ -83,9 +83,9 @@ public class MapCoordinates : MonoBehaviour
         currentProvinceID = provinceLookup["#4A6FD9"];
     }
     
-    Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
+  //  Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
     BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
-    Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
+    //Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
     
     highlighter = GetComponent<glowClick>();
     if (highlighter == null)
@@ -117,7 +117,7 @@ public class MapCoordinates : MonoBehaviour
                 Color clickedColor = mapTexture.GetPixel(x, y);
                 string clickedHex = ProvinceLoader.ColorToHex(clickedColor);
 
-                Debug.Log($"Clicked Color RGBA: ({clickedColor.r:F3}, {clickedColor.g:F3}, {clickedColor.b:F3}, {clickedColor.a:F3}) -> Hex: '{clickedHex}' (length: {clickedHex.Length})");
+              //  Debug.Log($"Clicked Color RGBA: ({clickedColor.r:F3}, {clickedColor.g:F3}, {clickedColor.b:F3}, {clickedColor.a:F3}) -> Hex: '{clickedHex}' (length: {clickedHex.Length})");
 
                 //Debug.Log($"UV: ({u:F3}, {v:F3}) -> Pixel: ({x}, {y}) -> Hex: {clickedHex}");
                 
@@ -132,14 +132,14 @@ public class MapCoordinates : MonoBehaviour
 
                     string neighboorsList = string.Join(", ", data.neighbors);
 
-                    Debug.Log($"Clicked: {data.provinceID}, the nighboors are :  {neighboorsList}");
+                  //  Debug.Log($"Clicked: {data.provinceID}, the nighboors are :  {neighboorsList}");
 
                     if (currentProvinceID != null && currentProvinceID.neighbors.Contains(clickedProvince.provinceID))
                     {
 
                         Vector3 targetPosition = getInfo.GetProvinceWorldPosition(clickedHex, provinceLookup);
                         CurrentUnit.MoveToProvince(clickedProvince.provinceID, targetPosition);
-                        Debug.Log($"Moving {CurrentUnit.unitName} to {clickedProvince.provinceID} at {targetPosition}");
+                        //Debug.Log($"Moving {CurrentUnit.unitName} to {clickedProvince.provinceID} at {targetPosition}");
 
                         currentProvinceID = clickedProvince;
 
@@ -234,7 +234,7 @@ public class MapCoordinates : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"No center position for {data.provinceID}");
+           // Debug.LogWarning($"No center position for {data.provinceID}");
         }
     }
 }

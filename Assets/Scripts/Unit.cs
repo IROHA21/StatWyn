@@ -34,10 +34,10 @@ public class Unit : MonoBehaviour
             {
                 transform.position = targetPosition; // snap to exact position
                 isMoving = false;
-                Debug.Log($"{unitName} reached {currentProvinceID}");
-            }
+                
 
         }
+    }
     }
 
 
@@ -47,7 +47,7 @@ public class Unit : MonoBehaviour
         currentProvinceID = provinceID;
         targetPosition = worldPosition;
         isMoving = true;
-        Debug.Log($"{unitName} moving to {provinceID} at {worldPosition}");
+        //Debug.Log($"{unitName} moving to {provinceID} at {worldPosition}");
 
     }
 

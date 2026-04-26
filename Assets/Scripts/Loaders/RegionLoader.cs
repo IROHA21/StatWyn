@@ -43,6 +43,6 @@ public static class RegionLoader
             }
         }
         
-        Debug.Log($"Loaded {targetDictionary.Count} regions");
+        //Debug.Log($"Loaded {targetDictionary.Count} regions");
     }
 }

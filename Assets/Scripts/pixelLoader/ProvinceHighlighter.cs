@@ -26,7 +26,7 @@ public class glowClick : MonoBehaviour
         provincePixels = BorderPixelLoader.provincesPixels;
         
         // Step 3: Confirm it loaded
-        Debug.Log($"Loaded {provincePixels.Count} provinces for glow");
+       // Debug.Log($"Loaded {provincePixels.Count} provinces for glow");
     }
 
     // ========== CREATE THE GLOW LAYER (TRANSPARENT QUAD OVER MAP) ==========
@@ -36,7 +36,7 @@ public class glowClick : MonoBehaviour
         Renderer renderer = GetComponent<Renderer>();
         sourceTexture = (Texture2D)renderer.material.mainTexture;
         
-        Debug.Log($"CreateGlowLayer: Texture size = {sourceTexture.width} x {sourceTexture.height}");
+        //Debug.Log($"CreateGlowLayer: Texture size = {sourceTexture.width} x {sourceTexture.height}");
 
         // Create a new empty texture (same size as map) - this will hold the glow
         glowTexture = new Texture2D(sourceTexture.width, sourceTexture.height);
@@ -70,7 +70,7 @@ public class glowClick : MonoBehaviour
         glowMat.mainTexture.filterMode = FilterMode.Point;
         glowQuad.GetComponent<Renderer>().material = glowMat;
         
-        Debug.Log($"CreateGlowLayer: Quad created at position {glowQuad.transform.position}");
+       // Debug.Log($"CreateGlowLayer: Quad created at position {glowQuad.transform.position}");
     }
 
     // ========== PUBLIC FUNCTION: START GLOWING A PROVINCE ==========

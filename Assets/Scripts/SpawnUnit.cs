@@ -9,20 +9,20 @@ public class SpawnUnit
     {
         if (unitPrefab == null)
         {
-            Debug.LogError("Unit prefab not assigned in the Inspector!");
+            //Debug.LogError("Unit prefab not assigned in the Inspector!");
             return null;
         }
 
         if(!provinceLookup.ContainsKey(provinceHex))
         {
-            Debug.LogError($"Province with hex {provinceHex} not found in lookup!");
+            //Debug.LogError($"Province with hex {provinceHex} not found in lookup!");
             return null;
         }
 
         ProvinceData Data = provinceLookup[provinceHex];
         if (Data.centerPosition == Vector3.zero)
         {
-            Debug.LogError($"Province {Data.provinceID} has no center position set!");
+           // Debug.LogError($"Province {Data.provinceID} has no center position set!");
             return null;
         }
 
@@ -33,7 +33,7 @@ public class SpawnUnit
         currentUnit.currentProvinceID = Data.provinceID;
         currentUnit.moveSpeed = 5f; // Example speed, can be set as needed
 
-        Debug.Log($"Spawned unit {unitName} in province {Data.provinceID} at position {Data.centerPosition}");
+        //Debug.Log($"Spawned unit {unitName} in province {Data.provinceID} at position {Data.centerPosition}");
 
         return currentUnit;
     }

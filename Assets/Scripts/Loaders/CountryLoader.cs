@@ -41,6 +41,6 @@ public static class CountryLoader
             }
         }
         
-        Debug.Log($"Loaded {targetDictionary.Count} countries");
+       // Debug.Log($"Loaded {targetDictionary.Count} countries");
     }
 }

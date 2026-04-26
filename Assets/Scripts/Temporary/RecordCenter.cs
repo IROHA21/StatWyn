@@ -13,9 +13,9 @@ public class RecordCenter : MonoBehaviour
         Renderer myRenderer = GetComponent<Renderer>();
         mapTexture = (Texture2D)myRenderer.material.mainTexture;
         
-        Debug.Log("=== CENTER RECORDER ===");
-        Debug.Log("Press C to record center at mouse position");
-        Debug.Log("Press S to save all to file");
+        //Debug.Log("=== CENTER RECORDER ===");
+        //Debug.Log("Press C to record center at mouse position");
+        //Debug.Log("Press S to save all to file");
     }
     
     void Update()
@@ -56,9 +56,9 @@ public class RecordCenter : MonoBehaviour
                 marker.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
                 marker.GetComponent<Renderer>().material.color = Color.green;
                 
-                Debug.Log($"<color=green>RECORDED #{savedCenters.Count}:</color>");
-                Debug.Log($"  Hex: {hexColor}");
-                Debug.Log($"  Position: {position}");
+                //Debug.Log($"<color=green>RECORDED #{savedCenters.Count}:</color>");
+                //Debug.Log($"  Hex: {hexColor}");
+                //Debug.Log($"  Position: {position}");
             }
         }
         
@@ -72,15 +72,15 @@ public class RecordCenter : MonoBehaviour
     {
         if (savedCenters.Count == 0)
         {
-            Debug.LogWarning("Nothing to save. Press C to record centers first.");
+           // Debug.LogWarning("Nothing to save. Press C to record centers first.");
             return;
         }
         
         string path = Application.dataPath + "/ProvinceCenters.txt";
         File.WriteAllLines(path, savedCenters.ToArray());
         
-        Debug.Log($"<color=green>SAVED {savedCenters.Count} centers to: {path}</color>");
-        Debug.Log("File contents:");
+       // Debug.Log($"<color=green>SAVED {savedCenters.Count} centers to: {path}</color>");
+        //Debug.Log("File contents:");
         foreach (string line in savedCenters)
         {
             Debug.Log($"  {line}");

@@ -9,17 +9,17 @@ public static class BorderPixelLoader
 
     public static void LoadPixelsFromFile(TextAsset pixelFile)
     {
-        Debug.Log($"LoadPixelsFromFile called with file: {pixelFile?.name ?? "NULL"}");
+       // Debug.Log($"LoadPixelsFromFile called with file: {pixelFile?.name ?? "NULL"}");
         
         if (pixelFile == null)
         {
-            Debug.LogError("Pixel file is null.");
+             Debug.LogError("Pixel file is null.");
             return;
         }
         provincesPixels.Clear();
 
         string[] lines = pixelFile.text.Split('\n');
-        Debug.Log($"Total lines in file: {lines.Length}");
+        //Debug.Log($"Total lines in file: {lines.Length}");
 
         foreach (string line in lines)
         {
@@ -51,12 +51,12 @@ public static class BorderPixelLoader
                 }
 
                 provincesPixels[hexColor] = pixels;
-                Debug.Log($"Loaded {pixels.Count} pixels for province with color {hexColor}");
+               // Debug.Log($"Loaded {pixels.Count} pixels for province with color {hexColor}");
 
             }
          
         }
-        Debug.Log($"Total provinces loaded: {provincesPixels.Count}");
+       // Debug.Log($"Total provinces loaded: {provincesPixels.Count}");
 
 
     }

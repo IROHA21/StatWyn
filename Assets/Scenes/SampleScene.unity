@@ -156,7 +156,7 @@ TerrainCollider:
     m_Bits: 0
   m_LayerOverridePriority: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_TerrainData: {fileID: 15600000, guid: 111f4a95099bb154b841d9e5c5597fb0, type: 2}
   m_EnableTreeColliders: 1
@@ -208,12 +208,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 470256332}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -5, y: 0.1, z: -5}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -18.83, y: 0.1, z: -5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1531599911}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &705507993
 GameObject:
@@ -414,11 +414,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e88807871c8baee4688df6bbb27de0da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  panSpeed: 20
   zoomSpeed: 5
-  minZoom: 5
-  maxZoom: 20
-  invertDrag: 0
+  minZoomDistance: 1
+  maxZoomDistance: 20
+  panSpeed: 10
+  dragSensitivity: 1
+  camOffset: {x: 0, y: 10, z: 0}
+  target: {fileID: 0}
 --- !u!1 &1531599907
 GameObject:
   m_ObjectHideFlags: 0
@@ -435,6 +437,7 @@ GameObject:
   - component: {fileID: 1531599914}
   - component: {fileID: 1531599915}
   - component: {fileID: 1531599916}
+  - component: {fileID: 1531599917}
   m_Layer: 0
   m_Name: Map
   m_TagString: Untagged
@@ -504,7 +507,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 470256335}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1531599912
@@ -590,6 +594,18 @@ MonoBehaviour:
   glowColor: {r: 1, g: 0.44275087, b: 0, a: 1}
   glowOpacity: 0.5
   glowDuration: 2
+--- !u!114 &1531599917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1531599907}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73a74c951197de44dbf14781d29bb779, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1736013281
 GameObject:
   m_ObjectHideFlags: 0
@@ -629,4 +645,3 @@ SceneRoots:
   - {fileID: 705507995}
   - {fileID: 1531599911}
   - {fileID: 1736013282}
-  - {fileID: 470256335}

@@ -1,0 +1,1630 @@
+﻿===== Scripts\black-borders\borders.cs =====
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class BorderDrawer : MonoBehaviour
+{
+    [Header("Border Settings")]
+    public Color borderColor = Color.black;
+    [Range(0, 1)] public float borderOpacity = 1f;
+    [Range(0, 3)] public float borderThickness = 1f;  // Float now!
+    public GameObject targetVisualObject;
+    
+    private Texture2D borderTexture;
+    private Texture2D sourceTexture;
+    private GameObject borderQuad;
+    
+    void Start()
+    {
+        StartCoroutine(DrawPermanentBorders());
+    }
+    
+    IEnumerator DrawPermanentBorders()
+    {
+        while (BorderPixelLoader.provincesPixels == null || 
+               BorderPixelLoader.provincesPixels.Count == 0)
+        {
+            yield return null;
+        }
+        
+        Renderer renderer = GetComponent<Renderer>();
+        sourceTexture = (Texture2D)renderer.material.mainTexture;
+        
+        borderTexture = new Texture2D(sourceTexture.width, sourceTexture.height);
+        borderTexture.filterMode = FilterMode.Point;
+        
+        Color[] transparent = new Color[sourceTexture.width * sourceTexture.height];
+        for (int i = 0; i < transparent.Length; i++)
+            transparent[i] = Color.clear;
+        borderTexture.SetPixels(transparent);
+        
+        DrawAllBorders();
+        borderTexture.Apply();
+        
+        borderQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        
+        if (targetVisualObject != null)
+            borderQuad.transform.SetParent(targetVisualObject.transform);
+        else
+            borderQuad.transform.SetParent(transform);
+        
+        Destroy(borderQuad.GetComponent<Collider>());
+        borderQuad.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        borderQuad.transform.localPosition = new Vector3(0, 0.1f, 0);
+        borderQuad.transform.localScale = new Vector3(10, 10, 1);
+        
+        Material borderMat = new Material(Shader.Find("Unlit/Transparent"));
+        borderMat.mainTexture = borderTexture;
+        borderMat.mainTexture.filterMode = FilterMode.Point;
+        borderQuad.GetComponent<Renderer>().material = borderMat;
+        
+        Debug.Log($"Borders drawn: Color={borderColor}, Opacity={borderOpacity}, Thickness={borderThickness}");
+    }
+    
+    void DrawAllBorders()
+    {
+        int borderCount = 0;
+        
+        // Create color with opacity
+        Color finalColor = new Color(borderColor.r, borderColor.g, borderColor.b, borderOpacity);
+        
+        // Calculate radius based on float thickness
+        float radius = borderThickness / 2f;
+        int minRadius = Mathf.FloorToInt(radius);
+        int maxRadius = Mathf.CeilToInt(radius);
+        
+        foreach (var entry in BorderPixelLoader.provincesPixels)
+        {
+            List<Vector2Int> pixels = entry.Value;
+            
+            foreach (Vector2Int pixel in pixels)
+            {
+                if (IsBorderPixel(pixel.x, pixel.y))
+                {
+                    int centerX = sourceTexture.width - 1 - pixel.x;
+                    int centerY = sourceTexture.height - 1 - pixel.y;
+                    
+                    // Draw a circle of pixels for smooth thickness
+                    for (int dx = -maxRadius; dx <= maxRadius; dx++)
+                    {
+                        for (int dy = -maxRadius; dy <= maxRadius; dy++)
+                        {
+                            float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                            
+                            // Only draw pixels within the radius
+                            if (distance <= radius + 0.5f)
+                            {
+                                int nx = centerX + dx;
+                                int ny = centerY + dy;
+                                
+                                if (nx >= 0 && nx < sourceTexture.width && 
+                                    ny >= 0 && ny < sourceTexture.height)
+                                {
+                                    borderTexture.SetPixel(nx, ny, finalColor);
+                                    borderCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Debug.Log($"Drew {borderCount} border pixels");
+    }
+    
+    bool IsBorderPixel(int x, int y)
+    {
+        Color currentColor = sourceTexture.GetPixel(x, y);
+        
+        if (x + 1 < sourceTexture.width)
+        {
+            Color rightColor = sourceTexture.GetPixel(x + 1, y);
+            if (!ColorsMatch(currentColor, rightColor))
+                return true;
+        }
+        
+        if (x - 1 >= 0)
+        {
+            Color leftColor = sourceTexture.GetPixel(x - 1, y);
+            if (!ColorsMatch(currentColor, leftColor))
+                return true;
+        }
+        
+        if (y + 1 < sourceTexture.height)
+        {
+            Color upColor = sourceTexture.GetPixel(x, y + 1);
+            if (!ColorsMatch(currentColor, upColor))
+                return true;
+        }
+        
+        if (y - 1 >= 0)
+        {
+            Color downColor = sourceTexture.GetPixel(x, y - 1);
+            if (!ColorsMatch(currentColor, downColor))
+                return true;
+        }
+        
+        return false;
+    }
+    
+    bool ColorsMatch(Color a, Color b)
+    {
+        float tolerance = 0.01f;
+        return Mathf.Abs(a.r - b.r) < tolerance &&
+               Mathf.Abs(a.g - b.g) < tolerance &&
+               Mathf.Abs(a.b - b.b) < tolerance;
+    }
+}
+
+
+
+===== Scripts\Camera\CameraController.cs =====
+using UnityEngine;
+
+public class CameraController : MonoBehaviour
+{
+    // Zoom variables
+    public float zoomSpeed = 5f;
+    public float minZoomDistance = 5f;
+    public float maxZoomDistance = 15f;
+    private float currentZoomDistance;
+
+    // Pan variables  
+    public float panSpeed = 10f;
+    private Vector3 currentTargetPosition;
+    
+    // Mouse drag pan variables
+    private Vector3 dragOrigin;
+    private bool isDragging = false;
+    public float dragSensitivity = 1f;
+
+    //how up in the air the camera is
+    public Vector3 camOffset = new Vector3(0, 10, 0);
+
+    // the target
+    public Transform target;
+
+    void Start()
+    {
+        target = GameObject.Find("Map").transform;
+        currentZoomDistance = camOffset.magnitude;
+        currentTargetPosition = target.position;
+    }
+
+    void Update()
+    {
+        // Check for mouse button down (left click)
+        if (Input.GetMouseButtonDown(0))
+        {
+            isDragging = true;
+            dragOrigin = Input.mousePosition;
+        }
+        
+        // Check for mouse button up
+        if (Input.GetMouseButtonUp(0))
+        {
+            isDragging = false;
+        }
+    }
+
+    void HandleMouseDrag()
+{
+    if (isDragging)
+    {
+        // Get current mouse position
+        Vector3 currentMousePos = Input.mousePosition;
+        
+        // Calculate difference since last frame
+        Vector3 difference = currentMousePos - dragOrigin;
+        
+        // Move the target position based on mouse movement (now natural direction)
+        Vector3 panMovement = new Vector3(
+            difference.x * dragSensitivity * Time.deltaTime,
+            0,
+            difference.y * dragSensitivity * Time.deltaTime
+        );
+        
+        currentTargetPosition += panMovement;
+        
+        // Update drag origin for smooth continuous dragging
+        dragOrigin = currentMousePos;
+    }
+}
+
+    void LateUpdate()
+    {
+        // Handle mouse drag panning
+        HandleMouseDrag();
+        
+        // ZOOM: Mouse wheel
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        currentZoomDistance -= scroll * zoomSpeed;
+        currentZoomDistance = Mathf.Clamp(currentZoomDistance, minZoomDistance, maxZoomDistance);
+        
+        // Apply position with zoom and pan
+        Vector3 zoomedOffset = camOffset.normalized * currentZoomDistance;
+        this.transform.position = currentTargetPosition + zoomedOffset;
+        this.transform.LookAt(currentTargetPosition);
+        
+        // Add 180 degrees to Y rotation to correct the reversed view
+        this.transform.rotation = Quaternion.Euler(
+            this.transform.eulerAngles.x - 20,
+            this.transform.eulerAngles.y + 180,
+            this.transform.eulerAngles.z
+        );
+    }
+}
+
+
+
+===== Scripts\DataClasses\CountryData.cs =====
+using UnityEngine;
+using System.Collections.Generic;
+
+[System.Serializable]
+public class CountryData
+{
+    public string countryID;
+    public List<string> neighborCountries;  // Which countries border this one
+    public List<string> regions;            // All region IDs in this country
+    
+    public CountryData(string id)
+    {
+        countryID = id;
+        neighborCountries = new List<string>();
+        regions = new List<string>();
+    }
+}
+
+
+
+===== Scripts\DataClasses\ProvinceData.cs =====
+using UnityEngine;
+using System.Collections.Generic; 
+
+
+[System.Serializable]  
+public class ProvinceData
+{
+    public string provinceID;
+    public string hexColor;
+    public string Country;  
+    public List<string> neighbors;
+    public Vector3 centerPosition;
+    
+    public ProvinceData(string name, string hex, string country, List<string> neighborList)
+    {
+        provinceID = name;
+        hexColor = hex;
+        Country = country;
+        neighbors = neighborList;
+        centerPosition = Vector3.zero;
+    }
+}
+
+
+
+===== Scripts\DataClasses\RegionData.cs =====
+using UnityEngine;
+using System.Collections.Generic;
+
+[System.Serializable]
+public class RegionData
+{
+    public string regionID;
+
+    public string regionName; // Optional: A human-readable name for the region
+    public string countryID;
+    public List<string> neighborRegions;  // Which regions border this one
+    public List<string> tiles;   
+              // All tile IDs in this region
+    
+    
+    public RegionData(string id, string country, string name)
+    {
+        regionID = id;
+        countryID = country;
+        neighborRegions = new List<string>();
+        tiles = new List<string>();
+        regionName = string.Empty;
+         regionName = name;
+    }
+}
+
+
+
+===== Scripts\getInfo.cs =====
+using System.Collections.Generic;
+using UnityEngine;
+
+
+public class getInfo
+{
+    public static ProvinceData GetProvinceData(string id, Dictionary<string, ProvinceData> provinceLookup)
+    {
+        foreach (var entry in provinceLookup)
+        {
+            if (entry.Value.provinceID == id)
+            {
+                return entry.Value;
+            }
+        }
+        return null;
+    }
+
+
+    public static Vector3 GetProvinceWorldPosition(string hexColor, Dictionary<string, ProvinceData> provinceLookup)
+    {
+        if (provinceLookup.ContainsKey(hexColor))
+        {
+            ProvinceData data = provinceLookup[hexColor];
+            if (data.centerPosition != Vector3.zero)
+            {
+                return data.centerPosition;
+            }
+            else
+            {
+                Debug.LogWarning($"Province {data.provinceID} has no center position set.");
+            }
+       }
+       return Vector3.zero;
+
+    }
+}
+
+
+
+===== Scripts\Loaders\CountryLoader.cs =====
+using System.Collections.Generic;
+using UnityEngine;
+
+public static class CountryLoader
+{
+    public static void LoadCountriesFromFile(TextAsset countryGroupsFile, Dictionary<string, CountryData> targetDictionary)
+    {
+        if (countryGroupsFile == null)
+        {
+            Debug.LogError("No country groups file assigned!");
+            return;
+        }
+        
+        string[] lines = countryGroupsFile.text.Split('\n');
+        
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            
+            string[] parts = line.Split('|');
+            
+            if (parts.Length == 2)
+            {
+                string countryID = parts[0].Trim();
+                string regionIDs = parts[1].Trim();
+                
+                CountryData country = new CountryData(countryID);
+                
+                string[] regions = regionIDs.Split(',');
+                foreach (string region in regions)
+                {
+                    country.regions.Add(region.Trim());
+                }
+                
+                targetDictionary[countryID] = country;
+            }
+            else
+            {
+                Debug.LogWarning($"Bad line in CountryGroups: {line}");
+            }
+        }
+        
+       // Debug.Log($"Loaded {targetDictionary.Count} countries");
+    }
+}
+
+
+
+===== Scripts\Loaders\ReadingFromTxt.cs =====
+using System.Collections.Generic;
+using UnityEngine;
+
+public static class ProvinceLoader
+{
+    // CHANGED: Dictionary now uses string (hex) as key, not Color
+    //public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<string, string> targetDictionary)
+    public static void LoadProvincesFromFile(TextAsset provinceDataFile, Dictionary<string, ProvinceData> targetDictionary)
+
+        
+    
+    {
+        if (provinceDataFile == null)
+        {
+            Debug.LogError("No file assigned! Drag Provinces.txt into the Inspector");
+            return;
+        }
+        
+        string[] lines = provinceDataFile.text.Split('\n');
+        
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            
+            string[] parts = line.Split('|');
+            
+            if (parts.Length == 4)
+            {
+                string provinceName = parts[0].Trim();
+                string hexColor = parts[1].Trim();  // This is already hex like "#FF0000"
+                string countryName = parts[2].Trim();
+                string neighborsString = parts[3].Trim();
+
+
+
+                List<string> neighbors = new List<string>();
+                if (!string.IsNullOrEmpty(neighborsString))
+                {
+                    string[] neighborArray = neighborsString.Split(',');
+                    foreach (string neighbor in neighborArray)
+                    {
+                        neighbors.Add(neighbor.Trim());
+                    }
+                }
+                ProvinceData data = new ProvinceData(provinceName, hexColor,countryName, neighbors);
+                // CHANGED: Store with hex as the key
+                targetDictionary[hexColor] = data;
+                
+               // Debug.Log($"Loaded: {provinceName} = {hexColor}");
+            }
+            else
+            {
+                Debug.LogWarning($"Bad line: {line} (expected 2 parts, got {parts.Length})");
+            }
+        }
+        
+       // Debug.Log($"Loaded {targetDictionary.Count} provinces");
+    }
+    
+    // NEW: Convert Color to Hex string
+    public static string ColorToHex(Color color)
+    {
+        // Convert float (0-1) to byte (0-255)
+        int r = Mathf.RoundToInt(color.r * 255);
+        int g = Mathf.RoundToInt(color.g * 255);
+        int b = Mathf.RoundToInt(color.b * 255);
+        
+        // Format as #RRGGBB
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+    
+    // Keep this for loading, but now it's private (only used internally)
+    private static Color HexToColor(string hex)
+    {
+        if (hex.StartsWith("#"))
+            hex = hex.Substring(1);
+        
+        float r = int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber) / 255f;
+        float g = int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber) / 255f;
+        float b = int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber) / 255f;
+        
+        return new Color(r, g, b);
+    }
+
+
+
+    
+}
+
+
+
+===== Scripts\Loaders\RegionLoader.cs =====
+using System.Collections.Generic;
+using UnityEngine;
+
+public static class RegionLoader
+{
+    public static void LoadRegionsFromFile(TextAsset regionGroupsFile, Dictionary<string, RegionData> targetDictionary)
+    {
+        if (regionGroupsFile == null)
+        {
+            Debug.LogError("No region groups file assigned!");
+            return;
+        }
+        
+        string[] lines = regionGroupsFile.text.Split('\n');
+        
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            
+            string[] parts = line.Split('|');
+            
+            if (parts.Length == 4)
+            {
+                string regionID = parts[0].Trim();
+                string regionName = parts[1].Trim();
+                string countryID = parts[2].Trim();
+                string tileIDs = parts[3].Trim();
+                
+                RegionData region = new RegionData(regionID, countryID, regionName);
+                
+                string[] tiles = tileIDs.Split(',');
+                foreach (string tile in tiles)
+                {
+                    region.tiles.Add(tile.Trim());
+                }
+                
+                targetDictionary[regionID] = region;
+            }
+            else
+            {
+                Debug.LogWarning($"Bad line in RegionGroups: {line}");
+            }
+        }
+        
+        //Debug.Log($"Loaded {targetDictionary.Count} regions");
+    }
+}
+
+
+
+===== Scripts\MapCoordinates.cs =====
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO;  
+
+public class MapCoordinates : MonoBehaviour
+{
+
+
+    // dictionary for quick lookup of province data by hex color
+    Dictionary<string, ProvinceData> provinceLookup = new Dictionary<string, ProvinceData>();
+
+    // Dictionaries for regions and countries, if needed later
+
+    public Dictionary<string, RegionData> regionLookup = new Dictionary<string, RegionData>();
+    public Dictionary<string, CountryData> countryLookup = new Dictionary<string, CountryData>();
+
+
+    public TextAsset regionGroupsFile;
+    public TextAsset countryGroupsFile;
+
+    public TextAsset provinceDataFile;
+
+    public TextAsset centerDataFile;
+    private Texture2D mapTexture;
+
+
+    public GameObject unitPrefab; // Assign in Inspector
+
+    private Unit CurrentUnit;
+    private ProvinceData currentProvinceID;
+    
+
+
+
+    public TextAsset provincePixelsFile;  // Drag ProvincePixels.txt here
+    private glowClick highlighter;
+    
+    void Start()
+{
+    // Load provinces (tiles)
+    ProvinceLoader.LoadProvincesFromFile(provinceDataFile, provinceLookup);
+    
+    // Load regions
+    RegionLoader.LoadRegionsFromFile(regionGroupsFile, regionLookup);
+    
+    // Load countries
+    CountryLoader.LoadCountriesFromFile(countryGroupsFile, countryLookup);
+
+
+
+    /* VERIFICATION: Print what was loaded
+    Debug.Log("=== VERIFICATION ===");
+    Debug.Log($"Tiles loaded: {provinceLookup.Count}");
+    Debug.Log($"Regions loaded: {regionLookup.Count}");
+    Debug.Log($"Countries loaded: {countryLookup.Count}");
+*/
+
+    foreach (var region in regionLookup.Values)
+    {
+        //Debug.Log($"Region: {region.regionID} ({region.regionName}) - Tiles: {string.Join(", ", region.tiles)}");
+    }
+    
+    // Print each country and its regions
+    foreach (var country in countryLookup.Values)
+    {
+       // Debug.Log($"Country: {country.countryID} - Regions: {string.Join(", ", country.regions)}");
+    }
+    
+    // Rest of your existing Start() code...
+    LoadCentersFromFile();
+    
+    Renderer myRenderer = GetComponent<Renderer>();
+    mapTexture = (Texture2D)myRenderer.material.mainTexture;
+    
+    ShowAllCenters();
+    
+    SpawnUnit spawnUnit = new SpawnUnit();
+    CurrentUnit = spawnUnit.spawnUnit("#4A6FD9", "Knight", provinceLookup, unitPrefab);
+    
+    if (CurrentUnit != null && provinceLookup.ContainsKey("#4A6FD9"))
+    {
+        currentProvinceID = provinceLookup["#4A6FD9"];
+    }
+    
+  //  Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
+    BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
+    //Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
+    
+    highlighter = GetComponent<glowClick>();
+    if (highlighter == null)
+        highlighter = gameObject.AddComponent<glowClick>();
+}
+    
+    void Update()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+            
+            if (Physics.Raycast(ray, out hit) && hit.collider.gameObject == this.gameObject)
+            {
+                // Manual UV calculation for Plane
+                Vector3 localPoint = transform.InverseTransformPoint(hit.point);
+                Vector3 size = GetComponent<Renderer>().bounds.size;
+                
+                float u = 1f - (localPoint.x + size.x * 0.5f) / size.x;
+                float v = 1f - ((localPoint.z + size.z * 0.5f) / size.z);
+                
+                u = Mathf.Clamp01(u);
+                v = Mathf.Clamp01(v);
+                
+                int x = (int)(u * mapTexture.width);
+                int y = (int)(v * mapTexture.height);
+                
+                Color clickedColor = mapTexture.GetPixel(x, y);
+                string clickedHex = ProvinceLoader.ColorToHex(clickedColor);
+
+              //  Debug.Log($"Clicked Color RGBA: ({clickedColor.r:F3}, {clickedColor.g:F3}, {clickedColor.b:F3}, {clickedColor.a:F3}) -> Hex: '{clickedHex}' (length: {clickedHex.Length})");
+
+                //Debug.Log($"UV: ({u:F3}, {v:F3}) -> Pixel: ({x}, {y}) -> Hex: {clickedHex}");
+                
+                if (provinceLookup.ContainsKey(clickedHex))
+                {
+                    ProvinceData clickedProvince = provinceLookup[clickedHex];
+
+                    highlighter.GlowRegion(clickedHex);
+                   
+
+                    ProvinceData data = clickedProvince;
+
+                    string neighboorsList = string.Join(", ", data.neighbors);
+
+                  //  Debug.Log($"Clicked: {data.provinceID}, the nighboors are :  {neighboorsList}");
+
+                    if (currentProvinceID != null && currentProvinceID.neighbors.Contains(clickedProvince.provinceID))
+                    {
+
+                        Vector3 targetPosition = getInfo.GetProvinceWorldPosition(clickedHex, provinceLookup);
+                        CurrentUnit.MoveToProvince(clickedProvince.provinceID, targetPosition);
+                        //Debug.Log($"Moving {CurrentUnit.unitName} to {clickedProvince.provinceID} at {targetPosition}");
+
+                        currentProvinceID = clickedProvince;
+
+                    }else
+                    {
+                        Debug.Log($"Cannot move to {clickedProvince.provinceID} because it's not a neighbor of {currentProvinceID?.provinceID}");
+                    }
+
+                    
+                    
+
+
+
+                }
+                else
+                {
+                    Debug.Log("Unknown territory");
+                }
+            }
+        }
+    }
+
+
+    void LoadCentersFromFile()
+{
+    if (centerDataFile == null)
+    {
+        Debug.LogWarning("Center data file not assigned!");
+        return;
+    }
+    
+    // Split the text asset content into lines
+    string[] lines = centerDataFile.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+    int loadedCount = 0;
+    
+    foreach (string line in lines)
+    {
+        if (string.IsNullOrWhiteSpace(line)) continue;
+        
+        string[] parts = line.Split('|');
+        if (parts.Length == 4)
+        {
+            string hexColor = parts[0].Trim();
+            float x = float.Parse(parts[1]);
+            float y = float.Parse(parts[2]);
+            float z = float.Parse(parts[3]);
+            
+            if (provinceLookup.ContainsKey(hexColor))
+            {
+                provinceLookup[hexColor].centerPosition = new Vector3(x, y, z);
+                loadedCount++;
+            }
+            else
+            {
+                Debug.LogWarning($"No province found for hex: {hexColor}");
+            }
+        }
+    }
+    
+    //Debug.Log($"Loaded {loadedCount} center positions");
+}
+
+
+    void ShowAllCenters()
+{
+    foreach (var entry in provinceLookup)
+    {
+        ProvinceData data = entry.Value;
+        
+        if (data.centerPosition != Vector3.zero)
+        {
+            // Create a small circle/sphere at the center
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            marker.transform.position = data.centerPosition;
+            marker.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
+            marker.transform.SetParent(this.transform); // Attach to map
+            
+            // Set color based on country or just green
+            Renderer rend = marker.GetComponent<Renderer>();
+            
+            if (data.Country == "France")
+                rend.material.color = Color.blue;
+            else if (data.Country == "Germany")
+                rend.material.color = Color.red;
+            else
+                rend.material.color = Color.green;
+            
+            // Remove collider so it doesn't block clicks
+            Destroy(marker.GetComponent<Collider>());
+            
+            //Debug.Log($"Created marker for {data.provinceID} at {data.centerPosition}");
+        }
+        else
+        {
+           // Debug.LogWarning($"No center position for {data.provinceID}");
+        }
+    }
+}
+}
+
+
+
+===== Scripts\pixelLoader\BorderPixelLoader.cs =====
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO;
+
+public static class BorderPixelLoader
+{
+    public static Dictionary<string, List<Vector2Int>> provincesPixels = new Dictionary<string, List<Vector2Int>>();
+
+    public static void LoadPixelsFromFile(TextAsset pixelFile)
+    {
+       // Debug.Log($"LoadPixelsFromFile called with file: {pixelFile?.name ?? "NULL"}");
+        
+        if (pixelFile == null)
+        {
+             Debug.LogError("Pixel file is null.");
+            return;
+        }
+        provincesPixels.Clear();
+
+        string[] lines = pixelFile.text.Split('\n');
+        //Debug.Log($"Total lines in file: {lines.Length}");
+
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            string[] parts = line.Split(new char[] { '|', ':' });
+            if (parts.Length == 2)
+            {
+                
+           
+
+            string hexColor = parts[0].Trim();
+            string pixelStrings = parts[1].Trim(';');
+
+            List<Vector2Int> pixels = new List<Vector2Int>();
+            string[] pixelPairs = pixelStrings.Split(';');
+
+            foreach (string pixelPair in pixelPairs)
+                {
+                    string[] coordinates = pixelPair.Split(',');
+                    if (coordinates.Length == 2)
+                    {
+                        int x = int.Parse(coordinates[0]);
+                        int y = int.Parse(coordinates[1]);
+                        pixels.Add(new Vector2Int(x, y));
+
+                    }
+                }
+
+                provincesPixels[hexColor] = pixels;
+               // Debug.Log($"Loaded {pixels.Count} pixels for province with color {hexColor}");
+
+            }
+         
+        }
+       // Debug.Log($"Total provinces loaded: {provincesPixels.Count}");
+
+
+    }
+}
+
+
+
+===== Scripts\pixelLoader\ProvinceHighlighter.cs =====
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class glowClick : MonoBehaviour
+{
+    // ========== INSPECTOR SETTINGS ==========
+    [Header("Glow Settings")]
+    public Color glowColor = Color.yellow;      // Color of the glow (yellow, green, red, etc.)
+    [Range(0, 1)] public float glowOpacity = 0.5f;  // How transparent (0 = invisible, 1 = solid)
+    public float glowDuration = 2f;             // How many seconds the glow lasts
+
+    // ========== PRIVATE VARIABLES ==========
+    private Texture2D glowTexture;              // The texture we draw glow on (transparent layer)
+    private Texture2D sourceTexture;            // The original map texture (to get dimensions)
+    private Coroutine currentGlowCoroutine;     // Reference to the pulsing animation
+    private Dictionary<string, List<Vector2Int>> provincePixels;  // YOUR pixel data: hex â†’ list of pixel coordinates
+
+    // ========== START ==========
+    void Start()
+    {
+        // Step 1: Create the transparent layer where glow will be drawn
+        CreateGlowLayer();
+        
+        // Step 2: Get the pixel data you already loaded in BorderPixelLoader
+        provincePixels = BorderPixelLoader.provincesPixels;
+        
+        // Step 3: Confirm it loaded
+       // Debug.Log($"Loaded {provincePixels.Count} provinces for glow");
+    }
+
+    // ========== CREATE THE GLOW LAYER (TRANSPARENT QUAD OVER MAP) ==========
+    void CreateGlowLayer()
+    {
+        // Get the map's current texture to know width/height
+        Renderer renderer = GetComponent<Renderer>();
+        sourceTexture = (Texture2D)renderer.material.mainTexture;
+        
+        //Debug.Log($"CreateGlowLayer: Texture size = {sourceTexture.width} x {sourceTexture.height}");
+
+        // Create a new empty texture (same size as map) - this will hold the glow
+        glowTexture = new Texture2D(sourceTexture.width, sourceTexture.height);
+        glowTexture.filterMode = FilterMode.Point;  // Sharp pixels, no blurring
+
+        // Fill it with completely transparent pixels (invisible)
+        Color[] transparent = new Color[sourceTexture.width * sourceTexture.height];
+        for (int i = 0; i < transparent.Length; i++)
+            transparent[i] = Color.clear;
+
+        glowTexture.SetPixels(transparent);
+        glowTexture.Apply();  // Saves the changes to the texture
+
+        // Create a physical Quad (flat square) to display the glow texture
+        GameObject glowQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        glowQuad.transform.SetParent(transform);  // Attach to map
+        Destroy(glowQuad.GetComponent<Collider>());  // Remove collider so clicks pass through
+        
+        // Rotate quad to lie flat on the ground (default Quad faces camera)
+        glowQuad.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        
+        // Position exactly at map center, slightly above to avoid z-fighting
+        glowQuad.transform.localPosition = new Vector3(0, 0.1f, 0);
+        
+        // Scale to match map size (adjust 10 to your map scale)
+        glowQuad.transform.localScale = new Vector3(10, 10, 1);
+        
+        // Create material that can show transparency
+        Material glowMat = new Material(Shader.Find("Unlit/Transparent"));
+        glowMat.mainTexture = glowTexture;
+        glowMat.mainTexture.filterMode = FilterMode.Point;
+        glowQuad.GetComponent<Renderer>().material = glowMat;
+        
+       // Debug.Log($"CreateGlowLayer: Quad created at position {glowQuad.transform.position}");
+    }
+
+    // ========== PUBLIC FUNCTION: START GLOWING A PROVINCE ==========
+    public void GlowRegion(string hexColor)
+    {
+        // Stop any existing glow animation
+        if (currentGlowCoroutine != null)
+            StopCoroutine(currentGlowCoroutine);
+
+        // Clear any existing glow pixels
+        ClearGlow();
+        
+        // Start the pulsing animation
+        currentGlowCoroutine = StartCoroutine(PulseGlow(hexColor));
+    }
+
+    // ========== THE PULSING ANIMATION ==========
+    IEnumerator PulseGlow(string hexColor)
+    {
+        // Clear any leftover glow
+        ClearGlow();
+
+        // Check if we have pixel data for this province
+        if (!provincePixels.ContainsKey(hexColor))
+        {
+            Debug.LogWarning($"No pixel data for {hexColor}");
+            yield break;
+        }
+
+        // Get all pixels that belong to this province (THE BUCKET FILL)
+        List<Vector2Int> pixels = provincePixels[hexColor];
+        float elapsed = 0f;
+        
+        // Loop while the glow should be visible
+        while (elapsed < glowDuration)
+        {
+            // Clear previous frame's glow (to create pulsing effect)
+            ClearGlow();
+            
+            // Calculate current opacity (pulses between 0.7 and 1.0 of original opacity)
+            // Mathf.Sin goes from -1 to 1, so we convert to 0.7-1.3 range, then multiply by glowOpacity
+            float pulse = glowOpacity * (0.7f + Mathf.Sin(elapsed * 10f) * 0.3f);
+            
+            // Draw glow on EVERY pixel of this province
+            foreach (Vector2Int pos in pixels)
+            {
+                // FLIP COORDINATES to match click detection
+                // Your click detection uses (1f - u) and (1f - v), so we flip both axes
+                int flippedX = sourceTexture.width - 1 - pos.x;
+                int flippedY = sourceTexture.height - 1 - pos.y;
+                
+                // Make sure coordinates are inside texture bounds
+                if (flippedX >= 0 && flippedX < glowTexture.width && 
+                    flippedY >= 0 && flippedY < glowTexture.height)
+                {
+                    // Create the glow color with current pulse opacity
+                    Color glowy = glowColor;
+                    glowy.a = pulse;
+                    
+                    // Draw ONE pixel (no expansion, exact province shape)
+                    glowTexture.SetPixel(flippedX, flippedY, glowy);
+                }
+            }
+            
+            // Apply all pixel changes to the texture
+            glowTexture.Apply();
+            
+            // Wait for next frame
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Glow duration finished - clear it
+        ClearGlow();
+        currentGlowCoroutine = null;
+    }
+
+    // ========== DRAW GLOW AT A SINGLE PIXEL (UNUSED, KEPT FOR REFERENCE) ==========
+    void AddGlowAt(int x, int y)
+    {
+        if (x >= 0 && x < glowTexture.width && y >= 0 && y < glowTexture.height)
+        {
+            Color glowy = glowColor;
+            glowy.a = glowOpacity;
+            glowTexture.SetPixel(x, y, glowy);
+        }
+    }
+
+    // ========== CLEAR ALL GLOW FROM THE TEXTURE ==========
+    public void ClearGlow()
+    {
+        if (glowTexture == null) return;
+
+        // Create an array of completely transparent pixels
+        Color[] clear = new Color[glowTexture.width * glowTexture.height];
+        for (int i = 0; i < clear.Length; i++)
+            clear[i] = Color.clear;
+
+        // Apply to the texture
+        glowTexture.SetPixels(clear);
+        glowTexture.Apply();
+    }
+}
+
+
+
+===== Scripts\SpawnUnit.cs =====
+using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
+
+
+public class SpawnUnit 
+{
+    public Unit spawnUnit(string provinceHex, string unitName, Dictionary<string, ProvinceData> provinceLookup, GameObject unitPrefab)
+    {
+        if (unitPrefab == null)
+        {
+            //Debug.LogError("Unit prefab not assigned in the Inspector!");
+            return null;
+        }
+
+        if(!provinceLookup.ContainsKey(provinceHex))
+        {
+            //Debug.LogError($"Province with hex {provinceHex} not found in lookup!");
+            return null;
+        }
+
+        ProvinceData Data = provinceLookup[provinceHex];
+        if (Data.centerPosition == Vector3.zero)
+        {
+           // Debug.LogError($"Province {Data.provinceID} has no center position set!");
+            return null;
+        }
+
+
+        GameObject newUnit = GameObject.Instantiate(unitPrefab, Data.centerPosition, Quaternion.identity);
+        Unit currentUnit = newUnit.GetComponent<Unit>();
+        currentUnit.unitName = unitName;
+        currentUnit.currentProvinceID = Data.provinceID;
+        currentUnit.moveSpeed = 5f; // Example speed, can be set as needed
+
+        //Debug.Log($"Spawned unit {unitName} in province {Data.provinceID} at position {Data.centerPosition}");
+
+        return currentUnit;
+    }
+
+}
+
+
+
+===== Scripts\Temporary\RecordCenter.cs =====
+using UnityEngine;
+using System.Collections.Generic;
+using System.IO;
+
+public class RecordCenter : MonoBehaviour
+{
+    private Texture2D mapTexture;
+    private List<string> savedCenters = new List<string>();
+    
+    void Start()
+    {
+        // Get texture once
+        Renderer myRenderer = GetComponent<Renderer>();
+        mapTexture = (Texture2D)myRenderer.material.mainTexture;
+        
+        //Debug.Log("=== CENTER RECORDER ===");
+        //Debug.Log("Press C to record center at mouse position");
+        //Debug.Log("Press S to save all to file");
+    }
+    
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+            
+            if (Physics.Raycast(ray, out hit) && hit.collider.gameObject == this.gameObject)
+            {
+                // Get HEX color from click position
+                Vector3 localPoint = transform.InverseTransformPoint(hit.point);
+                Vector3 size = GetComponent<Renderer>().bounds.size;
+                
+                float u = 1f - (localPoint.x + size.x * 0.5f) / size.x;
+                float v = 1f - ((localPoint.z + size.z * 0.5f) / size.z);
+                
+                u = Mathf.Clamp01(u);
+                v = Mathf.Clamp01(v);
+                
+                int x = (int)(u * mapTexture.width);
+                int y = (int)(v * mapTexture.height);
+                
+                Color clickedColor = mapTexture.GetPixel(x, y);
+                string hexColor = ProvinceLoader.ColorToHex(clickedColor);
+                
+                // Get position
+                Vector3 position = hit.point;
+                
+                // Save to list
+                string line = $"{hexColor}|{position.x}|{position.y}|{position.z}";
+                savedCenters.Add(line);
+                
+                // Create visual marker
+                GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                marker.transform.position = position;
+                marker.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
+                marker.GetComponent<Renderer>().material.color = Color.green;
+                
+                //Debug.Log($"<color=green>RECORDED #{savedCenters.Count}:</color>");
+                //Debug.Log($"  Hex: {hexColor}");
+                //Debug.Log($"  Position: {position}");
+            }
+        }
+        
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            SaveToFile();
+        }
+    }
+    
+    void SaveToFile()
+    {
+        if (savedCenters.Count == 0)
+        {
+           // Debug.LogWarning("Nothing to save. Press C to record centers first.");
+            return;
+        }
+        
+        string path = Application.dataPath + "/ProvinceCenters.txt";
+        File.WriteAllLines(path, savedCenters.ToArray());
+        
+       // Debug.Log($"<color=green>SAVED {savedCenters.Count} centers to: {path}</color>");
+        //Debug.Log("File contents:");
+        foreach (string line in savedCenters)
+        {
+            Debug.Log($"  {line}");
+        }
+    }
+}
+
+
+
+===== Scripts\Temporary\Scanner\ProvincePixelScanner.cs =====
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using Unity.VisualScripting;
+using UnityEngine;
+
+public class ProvincePixelScanner : MonoBehaviour
+{
+
+    [Header("Settings")]
+    public Texture2D provinceMap;
+    public bool ScanOnStart = true;
+
+    [Header("Output")]
+    public String outputfileName = "ProvincePixelData.txt";
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        if (ScanOnStart)
+        {
+            ScanAndSave();
+        }
+    }
+
+    [ContextMenu("Scan and Save")]
+    public void ScanAndSave()
+    {
+        if (provinceMap == null)
+        {
+            Debug.LogError("Province Map is not assigned.");
+            return;
+        }
+
+        Debug.Log("Starting scan of province map of width " + provinceMap.width + " and height " + provinceMap.height);
+
+        Dictionary<string, List<string>> pixelMap = new Dictionary<string, List<string>>();
+
+        for (int x = 0; x < provinceMap.width; x++)
+        {
+            for (int y = 0; y < provinceMap.height; y++)
+            {
+                Color pixelColor = provinceMap.GetPixel(x, y);
+                string hexColor = ColorToHex(pixelColor);
+
+
+                if (hexColor == "#000000" || hexColor == "#FFFFFF")
+                {
+                   continue; // Skip black and white pixels
+                }
+
+                if (!pixelMap.ContainsKey(hexColor))
+                {
+                    pixelMap[hexColor] = new List<string>();
+                }
+
+                pixelMap[hexColor].Add($"{x},{y}");
+            }
+        }
+        SaveToFile(pixelMap);
+
+        Debug.Log("Scan complete. Data saved to " + outputfileName);
+
+    }
+
+    void SaveToFile(Dictionary<string, List<string>> pixelMap)
+    {
+        string filePath = Application.dataPath + "/" + outputfileName;
+
+        List<string> lines = new List<string>();
+
+        foreach(var entry in pixelMap)
+        {
+            string hexcolor = entry.Key;
+            string allpixels = string.Join(";", entry.Value);
+            lines.Add($"{hexcolor}:{allpixels}");
+        }
+        File.WriteAllLines(filePath, lines);
+        Debug.Log("Data saved to " + filePath);
+        Debug.Log("Total unique colors (provinces) found: " + pixelMap.Count);
+    }
+
+    string ColorToHex(Color color)
+    {
+        int r = Mathf.RoundToInt(color.r * 255);
+        int g = Mathf.RoundToInt(color.g * 255);
+        int b = Mathf.RoundToInt(color.b * 255);
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+}
+
+
+
+===== Scripts\Unit.cs =====
+using System.ComponentModel;
+using UnityEngine;
+
+
+public class Unit : MonoBehaviour
+{
+    [Header("Unit information")]
+    public string unitName;
+    public string currentProvinceID;
+
+    [Header("movement settings")]
+    public float moveSpeed = 5f;
+    private Vector3 targetPosition;
+    private bool isMoving = false;
+
+    
+
+
+
+    void Update()
+    {
+        if (isMoving)
+        {
+
+            // MOVE towards the target position
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                targetPosition,
+                moveSpeed * Time.deltaTime
+            );
+
+            //check if we reached the target
+            if (Vector3.Distance(transform.position, targetPosition) < 0.01f)
+            {
+                transform.position = targetPosition; // snap to exact position
+                isMoving = false;
+                
+
+        }
+    }
+    }
+
+
+
+    public void MoveToProvince(string provinceID, Vector3 worldPosition)
+    {
+        currentProvinceID = provinceID;
+        targetPosition = worldPosition;
+        isMoving = true;
+        //Debug.Log($"{unitName} moving to {provinceID} at {worldPosition}");
+
+    }
+
+    public bool IsMoving()
+    {
+        return isMoving;
+    }
+
+
+
+
+}
+
+
+
+===== TutorialInfo\Scripts\Editor\ReadmeEditor.cs =====
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEditor;
+using System;
+using System.IO;
+using System.Reflection;
+
+[CustomEditor(typeof(Readme))]
+[InitializeOnLoad]
+public class ReadmeEditor : Editor
+{
+    static string s_ShowedReadmeSessionStateName = "ReadmeEditor.showedReadme";
+    
+    static string s_ReadmeSourceDirectory = "Assets/TutorialInfo";
+
+    const float k_Space = 16f;
+
+    static ReadmeEditor()
+    {
+        EditorApplication.delayCall += SelectReadmeAutomatically;
+    }
+
+    static void RemoveTutorial()
+    {
+        if (EditorUtility.DisplayDialog("Remove Readme Assets",
+            
+            $"All contents under {s_ReadmeSourceDirectory} will be removed, are you sure you want to proceed?",
+            "Proceed",
+            "Cancel"))
+        {
+            if (Directory.Exists(s_ReadmeSourceDirectory))
+            {
+                FileUtil.DeleteFileOrDirectory(s_ReadmeSourceDirectory);
+                FileUtil.DeleteFileOrDirectory(s_ReadmeSourceDirectory + ".meta");
+            }
+            else
+            {
+                Debug.Log($"Could not find the Readme folder at {s_ReadmeSourceDirectory}");
+            }
+
+            var readmeAsset = SelectReadme();
+            if (readmeAsset != null)
+            {
+                var path = AssetDatabase.GetAssetPath(readmeAsset);
+                FileUtil.DeleteFileOrDirectory(path + ".meta");
+                FileUtil.DeleteFileOrDirectory(path);
+            }
+
+            AssetDatabase.Refresh();
+        }
+    }
+
+    static void SelectReadmeAutomatically()
+    {
+        if (!SessionState.GetBool(s_ShowedReadmeSessionStateName, false))
+        {
+            var readme = SelectReadme();
+            SessionState.SetBool(s_ShowedReadmeSessionStateName, true);
+
+            if (readme && !readme.loadedLayout)
+            {
+                LoadLayout();
+                readme.loadedLayout = true;
+            }
+        }
+    }
+
+    static void LoadLayout()
+    {
+        var assembly = typeof(EditorApplication).Assembly;
+        var windowLayoutType = assembly.GetType("UnityEditor.WindowLayout", true);
+        var method = windowLayoutType.GetMethod("LoadWindowLayout", BindingFlags.Public | BindingFlags.Static);
+        method.Invoke(null, new object[] { Path.Combine(Application.dataPath, "TutorialInfo/Layout.wlt"), false });
+    }
+
+    static Readme SelectReadme()
+    {
+        var ids = AssetDatabase.FindAssets("Readme t:Readme");
+        if (ids.Length == 1)
+        {
+            var readmeObject = AssetDatabase.LoadMainAssetAtPath(AssetDatabase.GUIDToAssetPath(ids[0]));
+
+            Selection.objects = new UnityEngine.Object[] { readmeObject };
+
+            return (Readme)readmeObject;
+        }
+        else
+        {
+            Debug.Log("Couldn't find a readme");
+            return null;
+        }
+    }
+
+    protected override void OnHeaderGUI()
+    {
+        var readme = (Readme)target;
+        Init();
+
+        var iconWidth = Mathf.Min(EditorGUIUtility.currentViewWidth / 3f - 20f, 128f);
+
+        GUILayout.BeginHorizontal("In BigTitle");
+        {
+            if (readme.icon != null)
+            {
+                GUILayout.Space(k_Space);
+                GUILayout.Label(readme.icon, GUILayout.Width(iconWidth), GUILayout.Height(iconWidth));
+            }
+            GUILayout.Space(k_Space);
+            GUILayout.BeginVertical();
+            {
+
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(readme.title, TitleStyle);
+                GUILayout.FlexibleSpace();
+            }
+            GUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+        }
+        GUILayout.EndHorizontal();
+    }
+
+    public override void OnInspectorGUI()
+    {
+        var readme = (Readme)target;
+        Init();
+
+        foreach (var section in readme.sections)
+        {
+            if (!string.IsNullOrEmpty(section.heading))
+            {
+                GUILayout.Label(section.heading, HeadingStyle);
+            }
+
+            if (!string.IsNullOrEmpty(section.text))
+            {
+                GUILayout.Label(section.text, BodyStyle);
+            }
+
+            if (!string.IsNullOrEmpty(section.linkText))
+            {
+                if (LinkLabel(new GUIContent(section.linkText)))
+                {
+                    Application.OpenURL(section.url);
+                }
+            }
+
+            GUILayout.Space(k_Space);
+        }
+
+        if (GUILayout.Button("Remove Readme Assets", ButtonStyle))
+        {
+            RemoveTutorial();
+        }
+    }
+
+    bool m_Initialized;
+
+    GUIStyle LinkStyle
+    {
+        get { return m_LinkStyle; }
+    }
+
+    [SerializeField]
+    GUIStyle m_LinkStyle;
+
+    GUIStyle TitleStyle
+    {
+        get { return m_TitleStyle; }
+    }
+
+    [SerializeField]
+    GUIStyle m_TitleStyle;
+
+    GUIStyle HeadingStyle
+    {
+        get { return m_HeadingStyle; }
+    }
+
+    [SerializeField]
+    GUIStyle m_HeadingStyle;
+
+    GUIStyle BodyStyle
+    {
+        get { return m_BodyStyle; }
+    }
+
+    [SerializeField]
+    GUIStyle m_BodyStyle;
+
+    GUIStyle ButtonStyle
+    {
+        get { return m_ButtonStyle; }
+    }
+
+    [SerializeField]
+    GUIStyle m_ButtonStyle;
+
+    void Init()
+    {
+        if (m_Initialized)
+            return;
+        m_BodyStyle = new GUIStyle(EditorStyles.label);
+        m_BodyStyle.wordWrap = true;
+        m_BodyStyle.fontSize = 14;
+        m_BodyStyle.richText = true;
+
+        m_TitleStyle = new GUIStyle(m_BodyStyle);
+        m_TitleStyle.fontSize = 26;
+
+        m_HeadingStyle = new GUIStyle(m_BodyStyle);
+        m_HeadingStyle.fontStyle = FontStyle.Bold;
+        m_HeadingStyle.fontSize = 18;
+
+        m_LinkStyle = new GUIStyle(m_BodyStyle);
+        m_LinkStyle.wordWrap = false;
+
+        // Match selection color which works nicely for both light and dark skins
+        m_LinkStyle.normal.textColor = new Color(0x00 / 255f, 0x78 / 255f, 0xDA / 255f, 1f);
+        m_LinkStyle.stretchWidth = false;
+
+        m_ButtonStyle = new GUIStyle(EditorStyles.miniButton);
+        m_ButtonStyle.fontStyle = FontStyle.Bold;
+
+        m_Initialized = true;
+    }
+
+    bool LinkLabel(GUIContent label, params GUILayoutOption[] options)
+    {
+        var position = GUILayoutUtility.GetRect(label, LinkStyle, options);
+
+        Handles.BeginGUI();
+        Handles.color = LinkStyle.normal.textColor;
+        Handles.DrawLine(new Vector3(position.xMin, position.yMax), new Vector3(position.xMax, position.yMax));
+        Handles.color = Color.white;
+        Handles.EndGUI();
+
+        EditorGUIUtility.AddCursorRect(position, MouseCursor.Link);
+
+        return GUI.Button(position, label, LinkStyle);
+    }
+}
+
+
+
+===== TutorialInfo\Scripts\Readme.cs =====
+using System;
+using UnityEngine;
+
+public class Readme : ScriptableObject
+{
+    public Texture2D icon;
+    public string title;
+    public Section[] sections;
+    public bool loadedLayout;
+
+    [Serializable]
+    public class Section
+    {
+        public string heading, text, linkText, url;
+    }
+}
+
+
+

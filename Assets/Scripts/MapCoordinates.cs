@@ -5,92 +5,68 @@ using System.IO;
 
 public class MapCoordinates : MonoBehaviour
 {
-
-
     // dictionary for quick lookup of province data by hex color
     Dictionary<string, ProvinceData> provinceLookup = new Dictionary<string, ProvinceData>();
 
-    // Dictionaries for regions and countries, if needed later
-
+    // Dictionaries for regions and countries
     public Dictionary<string, RegionData> regionLookup = new Dictionary<string, RegionData>();
     public Dictionary<string, CountryData> countryLookup = new Dictionary<string, CountryData>();
 
-
+    // File references
     public TextAsset regionGroupsFile;
     public TextAsset countryGroupsFile;
-
     public TextAsset provinceDataFile;
-
     public TextAsset centerDataFile;
+    public TextAsset provincePixelsFile;
+
+    // Map and units
     private Texture2D mapTexture;
-
-
-    public GameObject unitPrefab; // Assign in Inspector
-
+    public GameObject unitPrefab;
     private Unit CurrentUnit;
     private ProvinceData currentProvinceID;
-    
-
-
-
-    public TextAsset provincePixelsFile;  // Drag ProvincePixels.txt here
     private glowClick highlighter;
     
     void Start()
-{
-    // Load provinces (tiles)
-    ProvinceLoader.LoadProvincesFromFile(provinceDataFile, provinceLookup);
-    
-    // Load regions
-    RegionLoader.LoadRegionsFromFile(regionGroupsFile, regionLookup);
-    
-    // Load countries
-    CountryLoader.LoadCountriesFromFile(countryGroupsFile, countryLookup);
-
-
-
-    /* VERIFICATION: Print what was loaded
-    Debug.Log("=== VERIFICATION ===");
-    Debug.Log($"Tiles loaded: {provinceLookup.Count}");
-    Debug.Log($"Regions loaded: {regionLookup.Count}");
-    Debug.Log($"Countries loaded: {countryLookup.Count}");
-*/
-
-    foreach (var region in regionLookup.Values)
     {
-        //Debug.Log($"Region: {region.regionID} ({region.regionName}) - Tiles: {string.Join(", ", region.tiles)}");
+        // Load provinces (tiles)
+        ProvinceLoader.LoadProvincesFromFile(provinceDataFile, provinceLookup);
+        
+        // Load regions
+        RegionLoader.LoadRegionsFromFile(regionGroupsFile, regionLookup);
+        
+        // Load countries
+        CountryLoader.LoadCountriesFromFile(countryGroupsFile, countryLookup);
+
+        // Load centers
+        LoadCentersFromFile();
+        
+        // Get texture
+        Renderer myRenderer = GetComponent<Renderer>();
+        mapTexture = (Texture2D)myRenderer.material.mainTexture;
+        
+        // Show centers (optional)
+        ShowAllCenters();
+        
+        // Spawn unit
+        SpawnUnit spawnUnit = new SpawnUnit();
+        CurrentUnit = spawnUnit.spawnUnit("#4A6FD9", "Knight", provinceLookup, unitPrefab);
+        
+        if (CurrentUnit != null && provinceLookup.ContainsKey("#4A6FD9"))
+        {
+            currentProvinceID = provinceLookup["#4A6FD9"];
+        }
+        
+        // Load pixel data for highlighting
+        BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
+        
+        // Setup highlighter and pass hierarchy data
+        highlighter = GetComponent<glowClick>();
+        if (highlighter == null)
+            highlighter = gameObject.AddComponent<glowClick>();
+        
+        // Pass the hierarchy data to glowClick
+        highlighter.Initialize(provinceLookup, regionLookup, countryLookup);
     }
-    
-    // Print each country and its regions
-    foreach (var country in countryLookup.Values)
-    {
-       // Debug.Log($"Country: {country.countryID} - Regions: {string.Join(", ", country.regions)}");
-    }
-    
-    // Rest of your existing Start() code...
-    LoadCentersFromFile();
-    
-    Renderer myRenderer = GetComponent<Renderer>();
-    mapTexture = (Texture2D)myRenderer.material.mainTexture;
-    
-    ShowAllCenters();
-    
-    SpawnUnit spawnUnit = new SpawnUnit();
-    CurrentUnit = spawnUnit.spawnUnit("#4A6FD9", "Knight", provinceLookup, unitPrefab);
-    
-    if (CurrentUnit != null && provinceLookup.ContainsKey("#4A6FD9"))
-    {
-        currentProvinceID = provinceLookup["#4A6FD9"];
-    }
-    
-  //  Debug.Log($"MapCoordinates: provincePixelsFile assigned: {provincePixelsFile != null}, name: {provincePixelsFile?.name ?? "NULL"}");
-    BorderPixelLoader.LoadPixelsFromFile(provincePixelsFile);
-    //Debug.Log($"MapCoordinates: After loading, provincesPixels count: {BorderPixelLoader.provincesPixels.Count}");
-    
-    highlighter = GetComponent<glowClick>();
-    if (highlighter == null)
-        highlighter = gameObject.AddComponent<glowClick>();
-}
     
     void Update()
     {
@@ -116,43 +92,38 @@ public class MapCoordinates : MonoBehaviour
                 
                 Color clickedColor = mapTexture.GetPixel(x, y);
                 string clickedHex = ProvinceLoader.ColorToHex(clickedColor);
-
-              //  Debug.Log($"Clicked Color RGBA: ({clickedColor.r:F3}, {clickedColor.g:F3}, {clickedColor.b:F3}, {clickedColor.a:F3}) -> Hex: '{clickedHex}' (length: {clickedHex.Length})");
-
-                //Debug.Log($"UV: ({u:F3}, {v:F3}) -> Pixel: ({x}, {y}) -> Hex: {clickedHex}");
                 
                 if (provinceLookup.ContainsKey(clickedHex))
                 {
                     ProvinceData clickedProvince = provinceLookup[clickedHex];
-
-                    highlighter.GlowRegion(clickedHex);
-                   
-
-                    ProvinceData data = clickedProvince;
-
-                    string neighboorsList = string.Join(", ", data.neighbors);
-
-                  //  Debug.Log($"Clicked: {data.provinceID}, the nighboors are :  {neighboorsList}");
-
+                    
+                    // GLOW BASED ON INSPECTOR MODE
+                    switch (highlighter.glowMode)
+                    {
+                        case glowClick.GlowMode.Tile:
+                            highlighter.GlowRegion(clickedHex);
+                            break;
+                        case glowClick.GlowMode.Region:
+                            string regionID = GetRegionIDForTile(clickedProvince.provinceID);
+                            if (regionID != null)
+                                highlighter.GlowByRegionID(regionID);
+                            break;
+                        case glowClick.GlowMode.Country:
+                            highlighter.GlowByCountryID(clickedProvince.Country);
+                            break;
+                    }
+                    
+                    // Movement logic
                     if (currentProvinceID != null && currentProvinceID.neighbors.Contains(clickedProvince.provinceID))
                     {
-
                         Vector3 targetPosition = getInfo.GetProvinceWorldPosition(clickedHex, provinceLookup);
                         CurrentUnit.MoveToProvince(clickedProvince.provinceID, targetPosition);
-                        //Debug.Log($"Moving {CurrentUnit.unitName} to {clickedProvince.provinceID} at {targetPosition}");
-
                         currentProvinceID = clickedProvince;
-
-                    }else
+                    }
+                    else
                     {
                         Debug.Log($"Cannot move to {clickedProvince.provinceID} because it's not a neighbor of {currentProvinceID?.provinceID}");
                     }
-
-                    
-                    
-
-
-
                 }
                 else
                 {
@@ -162,80 +133,70 @@ public class MapCoordinates : MonoBehaviour
         }
     }
 
-
     void LoadCentersFromFile()
-{
-    if (centerDataFile == null)
     {
-        Debug.LogWarning("Center data file not assigned!");
-        return;
-    }
-    
-    // Split the text asset content into lines
-    string[] lines = centerDataFile.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
-    int loadedCount = 0;
-    
-    foreach (string line in lines)
-    {
-        if (string.IsNullOrWhiteSpace(line)) continue;
-        
-        string[] parts = line.Split('|');
-        if (parts.Length == 4)
+        if (centerDataFile == null)
         {
-            string hexColor = parts[0].Trim();
-            float x = float.Parse(parts[1]);
-            float y = float.Parse(parts[2]);
-            float z = float.Parse(parts[3]);
+            Debug.LogWarning("Center data file not assigned!");
+            return;
+        }
+        
+        string[] lines = centerDataFile.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+        
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
             
-            if (provinceLookup.ContainsKey(hexColor))
+            string[] parts = line.Split('|');
+            if (parts.Length == 4)
             {
-                provinceLookup[hexColor].centerPosition = new Vector3(x, y, z);
-                loadedCount++;
-            }
-            else
-            {
-                Debug.LogWarning($"No province found for hex: {hexColor}");
+                string hexColor = parts[0].Trim();
+                float x = float.Parse(parts[1]);
+                float y = float.Parse(parts[2]);
+                float z = float.Parse(parts[3]);
+                
+                if (provinceLookup.ContainsKey(hexColor))
+                {
+                    provinceLookup[hexColor].centerPosition = new Vector3(x, y, z);
+                }
             }
         }
     }
-    
-    //Debug.Log($"Loaded {loadedCount} center positions");
-}
-
 
     void ShowAllCenters()
-{
-    foreach (var entry in provinceLookup)
     {
-        ProvinceData data = entry.Value;
-        
-        if (data.centerPosition != Vector3.zero)
+        foreach (var entry in provinceLookup)
         {
-            // Create a small circle/sphere at the center
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.transform.position = data.centerPosition;
-            marker.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
-            marker.transform.SetParent(this.transform); // Attach to map
+            ProvinceData data = entry.Value;
             
-            // Set color based on country or just green
-            Renderer rend = marker.GetComponent<Renderer>();
-            
-            if (data.Country == "France")
-                rend.material.color = Color.blue;
-            else if (data.Country == "Germany")
-                rend.material.color = Color.red;
-            else
-                rend.material.color = Color.green;
-            
-            // Remove collider so it doesn't block clicks
-            Destroy(marker.GetComponent<Collider>());
-            
-            //Debug.Log($"Created marker for {data.provinceID} at {data.centerPosition}");
-        }
-        else
-        {
-           // Debug.LogWarning($"No center position for {data.provinceID}");
+            if (data.centerPosition != Vector3.zero)
+            {
+                GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                marker.transform.position = data.centerPosition;
+                marker.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
+                marker.transform.SetParent(this.transform);
+                
+                Renderer rend = marker.GetComponent<Renderer>();
+                
+                if (data.Country == "France")
+                    rend.material.color = Color.blue;
+                else if (data.Country == "Germany")
+                    rend.material.color = Color.red;
+                else
+                    rend.material.color = Color.green;
+                
+                Destroy(marker.GetComponent<Collider>());
+            }
         }
     }
-}
+
+    private string GetRegionIDForTile(string tileID)
+    {
+        foreach (var region in regionLookup.Values)
+        {
+            if (region.tiles.Contains(tileID))
+                return region.regionID;
+        }
+        return null;
+    }
 }

@@ -5,171 +5,228 @@ using UnityEngine;
 public class glowClick : MonoBehaviour
 {
     // ========== INSPECTOR SETTINGS ==========
+    [Header("Glow Mode")]
+    public GlowMode glowMode = GlowMode.Tile;
+    
     [Header("Glow Settings")]
-    public Color glowColor = Color.yellow;      // Color of the glow (yellow, green, red, etc.)
-    [Range(0, 1)] public float glowOpacity = 0.5f;  // How transparent (0 = invisible, 1 = solid)
-    public float glowDuration = 2f;             // How many seconds the glow lasts
+    public Color glowColor = Color.yellow;
+    [Range(0, 1)] public float glowOpacity = 0.5f;
+    public float glowDuration = 2f;
 
-    // ========== PRIVATE VARIABLES ==========
-    private Texture2D glowTexture;              // The texture we draw glow on (transparent layer)
-    private Texture2D sourceTexture;            // The original map texture (to get dimensions)
-    private Coroutine currentGlowCoroutine;     // Reference to the pulsing animation
-    private Dictionary<string, List<Vector2Int>> provincePixels;  // YOUR pixel data: hex → list of pixel coordinates
-
-    // ========== START ==========
-    void Start()
+    public enum GlowMode
     {
-        // Step 1: Create the transparent layer where glow will be drawn
-        CreateGlowLayer();
-        
-        // Step 2: Get the pixel data you already loaded in BorderPixelLoader
-        provincePixels = BorderPixelLoader.provincesPixels;
-        
-        // Step 3: Confirm it loaded
-       // Debug.Log($"Loaded {provincePixels.Count} provinces for glow");
+        Tile,
+        Region,
+        Country
     }
 
-    // ========== CREATE THE GLOW LAYER (TRANSPARENT QUAD OVER MAP) ==========
+    // ========== PRIVATE VARIABLES ==========
+    private Texture2D glowTexture;
+    private Texture2D sourceTexture;
+    private Coroutine currentGlowCoroutine;
+    private Dictionary<string, List<Vector2Int>> provincePixels;
+    
+    private Dictionary<string, ProvinceData> provinceLookup;
+    private Dictionary<string, RegionData> regionLookup;
+    private Dictionary<string, CountryData> countryLookup;
+    private Dictionary<string, string> tileToHexLookup;
+
+    // OPTIMIZATION: Cache texture dimensions
+    private int texWidth;
+    private int texHeight;
+
+    public void Initialize(
+        Dictionary<string, ProvinceData> pLookup,
+        Dictionary<string, RegionData> rLookup,
+        Dictionary<string, CountryData> cLookup)
+    {
+        provinceLookup = pLookup;
+        regionLookup = rLookup;
+        countryLookup = cLookup;
+        
+        tileToHexLookup = new Dictionary<string, string>();
+        foreach (var entry in provinceLookup)
+        {
+            tileToHexLookup[entry.Value.provinceID] = entry.Key;
+        }
+    }
+
+    void Start()
+    {
+        CreateGlowLayer();
+        provincePixels = BorderPixelLoader.provincesPixels;
+        
+        // Cache dimensions
+        texWidth = sourceTexture.width;
+        texHeight = sourceTexture.height;
+    }
+
     void CreateGlowLayer()
     {
-        // Get the map's current texture to know width/height
         Renderer renderer = GetComponent<Renderer>();
         sourceTexture = (Texture2D)renderer.material.mainTexture;
         
-        //Debug.Log($"CreateGlowLayer: Texture size = {sourceTexture.width} x {sourceTexture.height}");
+        texWidth = sourceTexture.width;
+        texHeight = sourceTexture.height;
+        
+        glowTexture = new Texture2D(texWidth, texHeight);
+        glowTexture.filterMode = FilterMode.Point;
 
-        // Create a new empty texture (same size as map) - this will hold the glow
-        glowTexture = new Texture2D(sourceTexture.width, sourceTexture.height);
-        glowTexture.filterMode = FilterMode.Point;  // Sharp pixels, no blurring
-
-        // Fill it with completely transparent pixels (invisible)
-        Color[] transparent = new Color[sourceTexture.width * sourceTexture.height];
+        Color[] transparent = new Color[texWidth * texHeight];
         for (int i = 0; i < transparent.Length; i++)
             transparent[i] = Color.clear;
 
         glowTexture.SetPixels(transparent);
-        glowTexture.Apply();  // Saves the changes to the texture
+        glowTexture.Apply();
 
-        // Create a physical Quad (flat square) to display the glow texture
         GameObject glowQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        glowQuad.transform.SetParent(transform);  // Attach to map
-        Destroy(glowQuad.GetComponent<Collider>());  // Remove collider so clicks pass through
-        
-        // Rotate quad to lie flat on the ground (default Quad faces camera)
+        glowQuad.transform.SetParent(transform);
+        Destroy(glowQuad.GetComponent<Collider>());
         glowQuad.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        
-        // Position exactly at map center, slightly above to avoid z-fighting
         glowQuad.transform.localPosition = new Vector3(0, 0.1f, 0);
-        
-        // Scale to match map size (adjust 10 to your map scale)
         glowQuad.transform.localScale = new Vector3(10, 10, 1);
-        
-        // Create material that can show transparency
+
         Material glowMat = new Material(Shader.Find("Unlit/Transparent"));
         glowMat.mainTexture = glowTexture;
         glowMat.mainTexture.filterMode = FilterMode.Point;
         glowQuad.GetComponent<Renderer>().material = glowMat;
-        
-       // Debug.Log($"CreateGlowLayer: Quad created at position {glowQuad.transform.position}");
     }
 
-    // ========== PUBLIC FUNCTION: START GLOWING A PROVINCE ==========
     public void GlowRegion(string hexColor)
     {
-        // Stop any existing glow animation
         if (currentGlowCoroutine != null)
             StopCoroutine(currentGlowCoroutine);
 
-        // Clear any existing glow pixels
         ClearGlow();
-        
-        // Start the pulsing animation
         currentGlowCoroutine = StartCoroutine(PulseGlow(hexColor));
     }
 
-    // ========== THE PULSING ANIMATION ==========
+    public void GlowByRegionID(string regionID)
+    {
+        if (regionLookup == null || !regionLookup.ContainsKey(regionID)) return;
+        
+        List<string> hexColors = new List<string>();
+        foreach (string tileID in regionLookup[regionID].tiles)
+        {
+            if (tileToHexLookup.ContainsKey(tileID))
+                hexColors.Add(tileToHexLookup[tileID]);
+        }
+        StartCoroutine(GlowMultipleHexes(hexColors));
+    }
+
+    public void GlowByCountryID(string countryID)
+    {
+        if (countryLookup == null || !countryLookup.ContainsKey(countryID)) return;
+        
+        List<string> hexColors = new List<string>();
+        foreach (string regionID in countryLookup[countryID].regions)
+        {
+            if (regionLookup.ContainsKey(regionID))
+            {
+                foreach (string tileID in regionLookup[regionID].tiles)
+                {
+                    if (tileToHexLookup.ContainsKey(tileID))
+                        hexColors.Add(tileToHexLookup[tileID]);
+                }
+            }
+        }
+        StartCoroutine(GlowMultipleHexes(hexColors));
+    }
+
+    // OPTIMIZED: Pulse glow with cached dimensions
     IEnumerator PulseGlow(string hexColor)
     {
-        // Clear any leftover glow
         ClearGlow();
 
-        // Check if we have pixel data for this province
         if (!provincePixels.ContainsKey(hexColor))
         {
-            Debug.LogWarning($"No pixel data for {hexColor}");
             yield break;
         }
 
-        // Get all pixels that belong to this province (THE BUCKET FILL)
         List<Vector2Int> pixels = provincePixels[hexColor];
         float elapsed = 0f;
         
-        // Loop while the glow should be visible
+        // Pre-calculate flip once per province
+        List<Vector2Int> flippedPixels = new List<Vector2Int>(pixels.Count);
+        foreach (Vector2Int pos in pixels)
+        {
+            flippedPixels.Add(new Vector2Int(texWidth - 1 - pos.x, texHeight - 1 - pos.y));
+        }
+        
         while (elapsed < glowDuration)
         {
-            // Clear previous frame's glow (to create pulsing effect)
             ClearGlow();
-            
-            // Calculate current opacity (pulses between 0.7 and 1.0 of original opacity)
-            // Mathf.Sin goes from -1 to 1, so we convert to 0.7-1.3 range, then multiply by glowOpacity
             float pulse = glowOpacity * (0.7f + Mathf.Sin(elapsed * 10f) * 0.3f);
             
-            // Draw glow on EVERY pixel of this province
-            foreach (Vector2Int pos in pixels)
+            Color glowy = glowColor;
+            glowy.a = pulse;
+            
+            foreach (Vector2Int pos in flippedPixels)
             {
-                // FLIP COORDINATES to match click detection
-                // Your click detection uses (1f - u) and (1f - v), so we flip both axes
-                int flippedX = sourceTexture.width - 1 - pos.x;
-                int flippedY = sourceTexture.height - 1 - pos.y;
-                
-                // Make sure coordinates are inside texture bounds
-                if (flippedX >= 0 && flippedX < glowTexture.width && 
-                    flippedY >= 0 && flippedY < glowTexture.height)
-                {
-                    // Create the glow color with current pulse opacity
-                    Color glowy = glowColor;
-                    glowy.a = pulse;
-                    
-                    // Draw ONE pixel (no expansion, exact province shape)
-                    glowTexture.SetPixel(flippedX, flippedY, glowy);
-                }
+                glowTexture.SetPixel(pos.x, pos.y, glowy);
             }
             
-            // Apply all pixel changes to the texture
             glowTexture.Apply();
-            
-            // Wait for next frame
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        // Glow duration finished - clear it
         ClearGlow();
         currentGlowCoroutine = null;
     }
 
-    // ========== DRAW GLOW AT A SINGLE PIXEL (UNUSED, KEPT FOR REFERENCE) ==========
-    void AddGlowAt(int x, int y)
+    // OPTIMIZED: Multiple hexes with cached flips
+    IEnumerator GlowMultipleHexes(List<string> hexColors)
     {
-        if (x >= 0 && x < glowTexture.width && y >= 0 && y < glowTexture.height)
+        if (currentGlowCoroutine != null)
+            StopCoroutine(currentGlowCoroutine);
+        
+        ClearGlow();
+        
+        // Pre-collect and pre-flip all pixels once
+        List<Vector2Int> allFlippedPixels = new List<Vector2Int>();
+        foreach (string hex in hexColors)
         {
-            Color glowy = glowColor;
-            glowy.a = glowOpacity;
-            glowTexture.SetPixel(x, y, glowy);
+            if (provincePixels.ContainsKey(hex))
+            {
+                foreach (Vector2Int pos in provincePixels[hex])
+                {
+                    allFlippedPixels.Add(new Vector2Int(texWidth - 1 - pos.x, texHeight - 1 - pos.y));
+                }
+            }
         }
+        
+        float elapsed = 0f;
+        while (elapsed < glowDuration)
+        {
+            ClearGlow();
+            float pulse = glowOpacity * (0.7f + Mathf.Sin(elapsed * 10f) * 0.3f);
+            
+            Color glowy = glowColor;
+            glowy.a = pulse;
+            
+            foreach (Vector2Int pos in allFlippedPixels)
+            {
+                glowTexture.SetPixel(pos.x, pos.y, glowy);
+            }
+            
+            glowTexture.Apply();
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        
+        ClearGlow();
+        currentGlowCoroutine = null;
     }
 
-    // ========== CLEAR ALL GLOW FROM THE TEXTURE ==========
     public void ClearGlow()
     {
         if (glowTexture == null) return;
 
-        // Create an array of completely transparent pixels
-        Color[] clear = new Color[glowTexture.width * glowTexture.height];
+        Color[] clear = new Color[texWidth * texHeight];
         for (int i = 0; i < clear.Length; i++)
             clear[i] = Color.clear;
 
-        // Apply to the texture
         glowTexture.SetPixels(clear);
         glowTexture.Apply();
     }

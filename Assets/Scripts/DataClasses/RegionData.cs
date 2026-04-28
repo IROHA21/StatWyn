@@ -5,21 +5,23 @@ using System.Collections.Generic;
 public class RegionData
 {
     public string regionID;
-
-    public string regionName; // Optional: A human-readable name for the region
+    public string regionName;
     public string countryID;
-    public List<string> neighborRegions;  // Which regions border this one
-    public List<string> tiles;   
-              // All tile IDs in this region
+    public List<string> neighborRegions;
+    public List<string> tiles;
     
+    // ADD THIS LINE
+    public Dictionary<string, List<string>> pathsToRegions;
     
     public RegionData(string id, string country, string name)
     {
         regionID = id;
+        regionName = name;
         countryID = country;
         neighborRegions = new List<string>();
         tiles = new List<string>();
-        regionName = string.Empty;
-         regionName = name;
+        
+        // ADD THIS LINE
+        pathsToRegions = new Dictionary<string, List<string>>();
     }
 }

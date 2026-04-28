@@ -26,6 +26,10 @@ public class MapCoordinates : MonoBehaviour
     private ProvinceData currentProvinceID;
     private glowClick highlighter;
     
+    // Pathfinding variables
+    private List<ProvinceData> currentPath;
+    private bool isMovingAlongPath = false;
+    
     void Start()
     {
         // Load provinces (tiles)
@@ -43,6 +47,9 @@ public class MapCoordinates : MonoBehaviour
         // Get texture
         Renderer myRenderer = GetComponent<Renderer>();
         mapTexture = (Texture2D)myRenderer.material.mainTexture;
+        
+        // Make logic map invisible
+        myRenderer.enabled = false;
         
         // Show centers (optional)
         ShowAllCenters();
@@ -66,6 +73,9 @@ public class MapCoordinates : MonoBehaviour
         
         // Pass the hierarchy data to glowClick
         highlighter.Initialize(provinceLookup, regionLookup, countryLookup);
+        
+        // Initialize pathfinding manager
+        PathfindingManager.Initialize(provinceLookup, regionLookup, countryLookup);
     }
     
     void Update()
@@ -113,16 +123,25 @@ public class MapCoordinates : MonoBehaviour
                             break;
                     }
                     
-                    // Movement logic
-                    if (currentProvinceID != null && currentProvinceID.neighbors.Contains(clickedProvince.provinceID))
+                    // Movement logic using pathfinding
+                    if (currentProvinceID != null && !isMovingAlongPath)
                     {
-                        Vector3 targetPosition = getInfo.GetProvinceWorldPosition(clickedHex, provinceLookup);
-                        CurrentUnit.MoveToProvince(clickedProvince.provinceID, targetPosition);
-                        currentProvinceID = clickedProvince;
+                        List<ProvinceData> path = PathfindingManager.GetPath(currentProvinceID.provinceID, clickedProvince.provinceID);
+                        
+                        if (path.Count > 0)
+                        {
+                            // Store the full path and start following it
+                            currentPath = path;
+                            StartCoroutine(FollowPath());
+                        }
+                        else
+                        {
+                            Debug.Log($"Cannot move to {clickedProvince.provinceID} - no path found");
+                        }
                     }
-                    else
+                    else if (isMovingAlongPath)
                     {
-                        Debug.Log($"Cannot move to {clickedProvince.provinceID} because it's not a neighbor of {currentProvinceID?.provinceID}");
+                        Debug.Log("Unit is already moving, please wait");
                     }
                 }
                 else
@@ -131,6 +150,33 @@ public class MapCoordinates : MonoBehaviour
                 }
             }
         }
+    }
+    
+    // Follow the path step by step
+    IEnumerator FollowPath()
+    {
+        isMovingAlongPath = true;
+        
+        for (int i = 0; i < currentPath.Count; i++)
+        {
+            ProvinceData nextTile = currentPath[i];
+            Vector3 targetPosition = getInfo.GetProvinceWorldPosition(nextTile.hexColor, provinceLookup);
+            
+            // Move to this tile
+            CurrentUnit.MoveToProvince(nextTile.provinceID, targetPosition);
+            currentProvinceID = nextTile;
+            
+            // Wait until unit finishes moving to this tile
+            while (CurrentUnit.IsMoving())
+            {
+                yield return null;
+            }
+        }
+        
+        // Path complete
+        isMovingAlongPath = false;
+        currentPath = null;
+        Debug.Log("Unit reached destination");
     }
 
     void LoadCentersFromFile()
